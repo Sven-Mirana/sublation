@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/manifest-v3.json",
+  "title": "Skill Sublation Candidate Manifest v3",
+  "type": "object",
+  "required": ["schema_version", "candidate_id", "candidate_type", "source_skill", "candidate", "scope", "validation"],
+  "properties": {
+    "schema_version": { "const": 3 },
+    "candidate_id": { "type": "string", "minLength": 1 },
+    "candidate_type": { "enum": ["spec-patch", "script-enhance", "infra-fix", "tooling"] },
+    "created_by": { "type": "string" },
+    "created_at": { "type": "string" },
+    "source_skill": { "$ref": "#/$defs/file_tree" },
+    "candidate": { "$ref": "#/$defs/file_tree" },
+    "scope": {
+      "type": "object",
+      "required": ["changes", "out_of_scope"],
+      "properties": {
+        "changes": { "type": "array", "items": { "type": "string" } },
+        "out_of_scope": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "breaking_changes": { "type": "array", "items": { "type": "string" } },
+    "backward_compat": { "type": ["boolean", "null"] },
+    "relationships": {
+      "type": "object",
+      "required": ["sublation_pattern", "target_skill"],
+      "properties": {
+        "sublation_pattern": {
+          "enum": ["single_skill_patch", "cross_skill_absorption", "skill_merge_plan", "skill_split_plan"]
+        },
+        "target_skill": { "$ref": "#/$defs/skill_ref" },
+        "donor_skills": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/donor_skill_ref" }
+        },
+        "note": { "type": "string" }
+      }
+    },
+    "rights_provenance": {
+      "type": "object",
+      "properties": {
+        "policy": { "type": "string" },
+        "donor_rights": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/donor_rights_ref" }
+        }
+      }
+    },
+    "external_evaluations": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/external_evaluation" }
+    },
+    "rollback_hashes": { "type": "object", "additionalProperties": { "type": "string" } },
+    "trigger_observations": { "type": "array", "items": { "type": "string" } },
+    "validation": {
+      "type": "object",
+      "required": ["auditor_status", "cross_reviewed_by", "promotion_mode", "status"],
+      "properties": {
+        "auditor_status": { "enum": ["passed", "conditional", "failed"] },
+        "cross_reviewed_by": { "enum": ["none", "hermes", "codex", "both", "user-waived"] },
+        "promotion_mode": { "enum": ["none", "human_patch", "user_delegated_agent_patch", "rollback"] },
+        "status": { "enum": ["draft", "validated", "review_pending", "approved", "promoted", "observation_window", "closed", "rejected"] },
+        "formal_post_promotion": { "$ref": "#/$defs/file_tree" },
+        "post_promotion_safety": { "$ref": "#/$defs/post_promotion_safety" },
+        "fixture_assertions_passed": { "type": "integer", "minimum": 0 },
+        "promoted_by": { "type": "string" },
+        "promoted_at": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "closed_at": { "type": "string" },
+        "closure_reason": { "type": "string" },
+        "closure_evidence": { "type": "array", "items": { "type": "string" } },
+        "closure_reviewed_by": { "enum": ["none", "hermes", "codex", "both", "user-waived"] },
+        "closure_policy": { "type": "string" },
+        "rejection_reason": {
+          "enum": ["obsolete_superseded", "rejected_by_user", "failed_validation", "out_of_scope", "duplicate", "other"]
+        },
+        "superseded_by": { "type": "string" },
+        "notes": { "type": "string" }
+      }
+    }
+  },
+  "$defs": {
+    "file_tree": {
+      "type": "object",
+      "required": ["path", "tree_hash", "files"],
+      "properties": {
+        "path": { "type": "string" },
+        "tree_hash": { "type": "string", "pattern": "^sha256:" },
+        "files": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "skill_ref": {
+      "type": "object",
+      "required": ["name", "path"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "role": { "type": "string" }
+      }
+    },
+    "donor_skill_ref": {
+      "type": "object",
+      "required": ["name", "path", "absorbed_capability"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "absorbed_capability": { "type": "string", "minLength": 1 },
+        "retained_boundary": { "type": "string" }
+      }
+    },
+    "donor_rights_ref": {
+      "type": "object",
+      "required": ["skill_name", "path", "license", "provenance", "absorbed_material", "expression_copied", "permission_basis"],
+      "properties": {
+        "skill_name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "license": { "type": "string", "minLength": 1 },
+        "provenance": { "type": "string", "minLength": 1 },
+        "absorbed_material": { "type": "string", "minLength": 1 },
+        "expression_copied": { "type": "boolean" },
+        "permission_basis": { "type": "string", "minLength": 1 },
+        "notes": { "type": "string" }
+      }
+    },
+    "external_evaluation": {
+      "type": "object",
+      "required": ["evaluator", "target", "mode", "report_path", "formal_skill_modified"],
+      "properties": {
+        "evaluator": { "type": "string", "minLength": 1 },
+        "target": { "enum": ["candidate"] },
+        "mode": { "enum": ["read_only_scorecard", "proposal_only", "dry_run"] },
+        "report_path": { "type": "string", "minLength": 1 },
+        "formal_skill_modified": { "type": "boolean" },
+        "notes": { "type": "string" }
+      }
+    },
+    "post_promotion_safety": {
+      "type": "object",
+      "properties": {
+        "rollback_ready": { "type": "boolean" },
+        "rollback_point": { "type": "string" },
+        "target_path_verified": { "type": "boolean" },
+        "source_path_matches_promotion_target": { "type": ["boolean", "null"] },
+        "target_path_note": { "type": "string" },
+        "business_smoke_test": {
+          "type": "object",
+          "properties": {
+            "status": { "enum": ["passed", "pending", "failed", "not_required"] },
+            "evidence": { "type": "array", "items": { "type": "string" } }
+          }
+        },
+        "fallback_verified": { "type": ["boolean", "null"] },
+        "old_capability_retained": { "type": ["boolean", "null"] },
+        "notes": { "type": "string" }
+      }
+    }
+  }
+}
