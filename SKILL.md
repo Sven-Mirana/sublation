@@ -1,112 +1,342 @@
 ---
 name: skill-sublation
-description: 技能扬弃（Sublation/Aufhebung）——让技能从执行经验中产生观测、候选、验证、复核和晋升记录的可落地治理流程。正式技能目录默认只读；候选层自由打磨；用户可显式委托 Agent 执行低风险晋升。触发词：skill-sublation、技能扬弃、skill evolution、patch proposal、技能治理。
+description: 技能扬弃（Sublation/Aufhebung）——把执行经验沉淀为观测、候选、验证、可配置复核席位、用户批准、晋升和观察窗的可审计治理链路。sublation 也是它自己治理的第一个 skill。触发词：skill-sublation、技能扬弃、skill evolution、patch proposal、技能治理。
 ---
 
-# Skill Sublation — 技能扬弃 v3
+# Skill Sublation v2.0
 
-扬弃不是让 Agent 随手改正式技能，而是把执行经验沉淀成可审计的改进链路：
+Sublation 是技能治理宪法，不是自动改技能的捷径。
 
+它处理的核心矛盾是：Agent 会在执行中发现技能缺陷、边界裂缝和可吸收经验，但正式技能不能被即时、静默、无证据地改写。因此所有改进必须先进入候选层，用证据证明价值，再由用户守住生产门。
+
+标准链路：
+
+```text
+Observation -> Candidate -> Validation -> Review-seat reports
+-> Coordinator unified brief -> User decision
+-> Promotion -> Observation window -> Closure
 ```
-观测 observation -> 候选 candidate -> 验证 validation -> 交叉复核 review
--> 晋升 promotion -> 生产观察窗 observation window
+
+## 1. 宪法
+
+### 1.1 三条根本原则
+
+1. **所有 skill 开发都必须走 sublation 全链路**
+   创建、修改、吸收、合并、拆分、删除、发布前清理，都必须留下观测、候选、审计、复核、用户决策、回滚和观察窗证据。小改动可以批处理，但不能绕过账本。
+
+2. **sublation 必须自我扬弃**
+   sublation 不是只管别人的治理工具。它自身也是被治理的对象。每次流程暴露裂缝，都要回流为框架改进，并记录在 `references/sublation-self-evolution.md`。
+
+3. **不是管别人，是先被管**
+   参与治理的 agent 在要求其他 skill 接受治理前，先接受同一套约束。默认本地席位是 Hermes、Codex、Claude Code；其他用户可以换成自己的 agent，甚至只用一个 agent。自报“已完成”不算证据；grep、read-back、diff、hash、audit、fixture 才算证据。
+
+### 1.2 扬弃的判定
+
+扬弃不是“又多一个候选”，而是旧能力被保留，同时出现可证明的正向增量：
+
+- 能力更强或覆盖更广；
+- 边界更清；
+- 稳定性、安全性或可维护性更高；
+- 治理质量提升；
+- 旧 workflow 有 fallback 或明确的用户批准。
+
+没有正向增量，最多记录 observation；退化不叫扬弃。
+
+### 1.3 经验不是权威
+
+任何 agent、外部评估器、benchmark、scorecard 都只能提供证据，不能替代用户决策。晋升权只属于用户，除非用户在当前任务中明确委托 Agent 执行已批准的低风险合入。
+
+## 2. 硬边界
+
+### 2.1 正式技能默认只读
+
+Agent、cron、外部评估器不得自行修改 active skill path 下的 `SKILL.md`、`scripts/`、`schemas/`、`references/`。正式路径只能在用户明确批准晋升或回滚后被写入。
+
+### 2.2 候选层自由
+
+候选副本放在：
+
+```text
+~/.hermes/sublation/candidates/<skill>/<candidate-id>/
 ```
 
-NPL monitor 三轮实验只是引子：001 是规范层 `spec-patch`，002 是脚本层 `script-enhance`，003 是部署层 `infra-fix`。主线从现在起回到 skill-sublation 本体能力。
+候选目录不得出现在 active profile 的技能搜索路径中。候选可以自由实验，但必须声明 scope/out_of_scope，并保持可回滚。
 
-## 核心原则：手段 vs 目的
+### 2.3 合法晋升模式
 
-**用创造 skill 的方式来验证扬弃只是手段，不是目的。** 三场实验的价值不是「又多了三个候选记录」，而是每一场暴露了框架本身的裂缝——这些裂缝才是指向 skill-sublation 需要进化的路标。
+`validation.promotion_mode` 只允许：
 
-**把握主要矛盾的主要方面**：主要矛盾是「sublation 治理框架还不够完善」，主要方面是迭代 skill-sublation 本身。次要方面是「把扬弃应用到其他 skill」——它作为验证手段有用，但一旦验证完就退场，不要沉迷其中。**发现一个新裂缝的价值远大于在同类型 skill 上重复跑扬弃流程。**
+- `human_patch`：用户手工合入；
+- `user_delegated_agent_patch`：用户在当前任务中明确授权 Agent 合入；
+- `rollback`：按 rollback point 或 manifest 恢复。
 
-**判断标准**：如果你在考虑「下一个该扬弃哪个 skill」，你已经跑偏了。正确的问题是「这三个实验揭示了 sublation 框架的什么弱点，skill-sublation 的 SKILL.md 下一版应该怎么改」。
+cron 最多创建观测、候选、报告和提醒；不能自动晋升。
 
-## 硬边界
+### 2.4 删除和吸收
 
-1. **正式技能目录默认只读**：Agent/cron 不自行修改 active skill path 下的 `SKILL.md`、`scripts/`、`references/` 等文件。
-2. **候选层可自由打磨**：候选副本放在 `~/.hermes/sublation/candidates/<skill>/<candidate-id>/`，且不得出现在 active profile 的技能搜索路径中。
-3. **晋升有三种合法模式**：
-   - `human_patch`：人类手动合入。
-   - `user_delegated_agent_patch`：用户在当前任务中明确授权 Agent 合入，Agent 执行并记录。
-   - `rollback`：按 manifest 的 `rollback_hashes` 或备份恢复。
-4. **cron 不做自动晋升**：cron 最多创建观测、候选和提案；不能自行合入正式技能。
-5. **基础设施问题先走负面清单**：workdir、权限、密钥、网络临时失败、调度器 cwd 漂移，优先修配置或记录待办，不应伪装成技能内容缺陷。
-6. **合并删除须用户审批**：候选产出和复核由 Hermes/Codex 自主完成，但原技能删除（promote 时 `absorbed_into` 触发的删除动作）必须经用户明确批准。候选在 `candidates/` 沙盒中不伤原技能，Hermes 复核通过后呈报用户，用户点头才执行删除。流程：observe → candidate → audit → Hermes复核 → **【用户审批删除】** → promote。
+删除 donor skill、改 alias、改变 active profile、或把 donor 能力吸收到 umbrella skill，都必须有用户批准。候选层可以提出删除或吸收计划，但不能直接执行。
 
-## 最小落地命令
+### 2.5 禁止的外部能力
 
-从本技能目录运行：
+外部评估器默认只读。发现以下能力必须阻断或隔离：
+
+- optimizer 自动改写正式技能；
+- iterative loop 写原始文件；
+- sync/pull 覆盖本地正式目录；
+- `load_skill` 或 active profile 注入；
+- 读取、保存或转发用户凭据。
+
+外部评估只进入报告，不进入 authority。
+
+### 2.6 登录墙和 MCP 预留
+
+需要登录、验证码或人工授权的数据源，采用 human-in-the-loop：
+
+- Agent 可打开页面、定位控件、建立 provider contract；
+- 用户手动输入凭据和验证码；
+- Agent 不保存、不读取、不转发明文凭据；
+- 状态用 `login_required`、`captcha_pending`、`mcp_placeholder` 等表示。
+
+登录墙不是缺陷；保留 MCP 接口位置，不把它长期当作 PENDING 阻塞污染治理视图。
+
+### 2.7 幻觉声明规则
+
+任何“已写入”“已验证”“已晋升”“路径正确”的声明，都必须能被硬证据复验：
+
+- `rg` / `grep`；
+- `diff` / `git diff`；
+- hash / tree hash；
+- audit 输出；
+- fixture / smoke test；
+- read-back。
+
+自报不能抵消证据缺失。
+
+### 2.8 委托数据隔离
+
+委托给外部模型、外部评估器或跨 Agent `delegate_task` 的上下文，绝不能包含本地文件内容、本地路径清单、案件隐私、客户数据、workspace 目录树或用户真实文件系统摘要。
+
+正确做法是只传任务描述、候选 ID、抽象技术上下文和必要的非敏感参数；需要读取的文件由被委托方在其授权 session 中自行读取。事故背景见 `references/delegation-data-isolation-incident-20260527.md`。
+
+### 2.9 候选共享根一致性
+
+跨 Agent 协作时，候选的真相源是共享候选根：
+
+```text
+~/.hermes/sublation/candidates/<skill>/<candidate-id>/
+```
+
+Codex 工作区、Claude Code 临时目录或其他 agent 本地副本只能作为工作副本。任何修复报告必须说明修复发生在哪个 root、是否已同步共享根、共享根 audit/read-back 结果。Hermes 在确认候选状态前必须在共享根复跑，不得只接受 agent 自报。事故背景见 `references/candidate-layer-mirror-drift.md`。
+
+## 3. 可配置协作席位
+
+### 3.1 用户
+
+用户是最终决策者，负责批准或拒绝晋升、删除、能力收缩、跨边界合并和正式路径写入。
+
+### 3.2 Coordinator：统一传达席位
+
+Coordinator 负责流程协调和统一传达。默认由 Hermes 担任；其他部署可以由任意 agent、脚本或用户本人担任。职责是：
+
+- 收齐实现/审计报告；
+- 收齐独立复核报告；
+- 收齐业务/边界复核；
+- 合并、去重、标注分歧和阻塞项；
+- 用一份简报发给用户；
+- 晋升后确认观察窗、回滚点和证据齐整。
+
+默认 Hermes 办公室主任模式详见 `references/hermes-chief-of-staff.md`。
+
+### 3.3 Implementer/Auditor：实现和审计席位
+
+Implementer/Auditor 负责候选创建、代码/文档实现、PATCH.diff、manifest、审计修复、fixture、smoke test、回滚点和工程风险说明。默认由 Codex 担任；其他部署可以换成任意具备本地文件和审计能力的 agent。
+
+### 3.4 Independent Reviewer：独立交叉验证席位
+
+Independent Reviewer 负责从外部视角审读候选，重点找实现边界、反例、状态漂移、路径错配、未验证声明和回归风险。默认由 Claude Code 担任；其他部署可以换成任何未直接执行该候选改动的 agent。
+
+### 3.5 Business/Boundary Reviewer：业务和边界席位
+
+Business/Boundary Reviewer 负责判断 value_delta 是否真实、用户边界是否被侵蚀、权限/隐私/登录墙是否处理正确。默认由 Hermes 同时承担 coordinator 和业务/边界复核；其他部署可以拆给另一个 agent 或由用户本人复核。
+
+### 3.6 单 agent 和少 agent 模式
+
+如果用户只有一个 agent，不要伪装成三方独立：
+
+- 在 manifest 中设置 `validation.review_policy.mode = single_agent`；
+- 记录 `policy_authorized_by = user`，并提供 `authorization_message_id` 或 `authorization_report_path`；
+- 把 `required_roles` 降为真实可执行的角色，例如 `combined_review`；
+- `pre_promotion_reports[]` 只记录真实存在的 reviewer；
+- 报告中明确写出“缺少独立交叉验证”的风险；
+- 用户最终批准仍不可省略。
+
+如果用户有多个但不是 Hermes/Codex/Claude Code，也用 `validation.review_policy.mode = configured_multi_agent` 声明实际席位、agent 名和最低报告数。非默认模式必须有用户授权证据；agent 不能通过自改 manifest 来降低自己的复核强度。`cross_reviewed_by = all` 在有 `review_policy` 时表示“所有配置为 required 的角色都已提供最新 approve 报告”，不是固定三元组。
+
+### 3.7 群聊桥
+
+协作桥可以是四方、三方、双方或单 agent 日志。桥只传递消息和状态，不授予晋升权。详见 `references/three-party-chat-bridge.md`。
+
+## 4. 八步流程
+
+### 4.1 Observe
+
+写入结构化观测，说明触发事件、证据、分类和建议动作：
 
 ```bash
-cd ~/.hermes/skills/hermes-agent/skill-sublation
-```
-
-### 1. 写入观测
-
-```bash
-python3 scripts/observe.py npl-monitor \
-  --skill-path ~/.hermes/skills/legal/npl-monitor \
-  --session cron_5deb084e32e9_20260526 \
+python3 scripts/observe.py <skill-name> \
+  --skill-path <formal-skill-path> \
+  --session <session-id> \
   --classification defect \
   --reflection-type SKILL_DEFECT \
-  --step "脚本状态输出" \
+  --step "<step>" \
   --status defect_suspected \
-  --evidence "数据文件缺少 source_ok/status" \
-  --summary "报告层无法区分数据源正常为空和异常为空" \
+  --evidence "<hard evidence>" \
+  --summary "<summary>" \
   --recommendation create_candidate
 ```
 
-输出写到 `~/.hermes/skill-observations/{skill_hash}/`。
+### 4.2 Gate
 
-### 2. 创建候选副本
+先判断是否值得建候选：
+
+- 用户显式要求；
+- 单次 critical defect；
+- 同一步骤 >=3 次可信 defect；
+- 明确的正向增量机会；
+- 生产事故或治理账本缺口。
+
+如果只是环境、cwd、权限、临时网络、登录墙或没有价值增量，优先记录 observation 或 provider contract，不急着建候选。
+
+### 4.3 Candidate Copy
+
+用候选脚本复制正式技能：
 
 ```bash
-python3 scripts/candidate.py create npl-monitor \
-  --source-path ~/.hermes/skills/legal/npl-monitor \
-  --candidate-type script-enhance \
+python3 scripts/candidate.py create <skill-name> \
+  --source-path <formal-skill-path> \
+  --candidate-type spec-patch \
   --agent codex \
-  --observation e6a18c28dbcb/observations/20260525-090428-cron_5deb.json
+  --observation <observation-id-or-summary>
 ```
 
-输出写到 `~/.hermes/sublation/candidates/<skill>/<candidate-id>/`。
+不要手写只含部分文件的 `source_skill.files`。完整 source hashes 是回滚和 drift 检查的根。
 
-### 3. 审计候选
+### 4.4 Edit Candidate
+
+只改候选目录。更新：
+
+- `SKILL.md` / `scripts/` / `schemas/` / `references/` 中属于 scope 的文件；
+- `RATIONALE.md`；
+- `EVIDENCE.md`；
+- `manifest.json`；
+- `PATCH.diff`。
+
+明确写出 `scope.changes` 和 `scope.out_of_scope`。
+
+### 4.5 Validate
+
+验证只用 fixture、临时副本、合成输入和 dry-run。禁止把验证写进真实用户数据或正式技能目录。
+
+必跑：
 
 ```bash
-python3 scripts/audit.py ~/.hermes/sublation/candidates/npl-monitor/<candidate-id>
+python3 scripts/audit.py <candidate-dir> --json
+find <candidate-dir> \( -name '__pycache__' -o -name '*.pyc' -o -name '*.pyo' \) -print
 ```
 
-`audit.py` 默认运行 strict checks。临时诊断旧候选时可用 `--no-strict` 只跑基础结构检查，但晋升前必须通过默认 strict audit。
+跨 Agent 候选还必须在共享候选根复跑同一组检查，确认工作区副本和共享根没有漂移。
 
-审计结果三态：
+涉及代码时，还要跑语法、单元、smoke、回归和业务最小路径。
 
-| 状态 | 含义 |
-|---|---|
-| `passed` | 可进入复核/晋升提案 |
-| `conditional` | 可人工判断，但需说明缺口 |
-| `failed` | 不应晋升 |
+### 4.6 Review-Seat Reports
 
-## 八步流程
+晋升前必须有配置中要求的复核意见。默认本地配置需要三类证据：
 
-1. **Observe**：用 `observe.py` 写入结构化观测。
-2. **Classify**：区分 `DISCOVERY`、`OPTIMIZATION`、`SKILL_DEFECT`、`EXECUTION_LAPSE`。
-3. **Trigger**：单次 `critical` 或同一步骤 ≥3 次可信 defect，才创建候选；用户显式要求可立即创建。
-4. **Candidate**：用 `candidate.py` 复制正式技能到候选层，生成 manifest 和说明文件。
-5. **Edit**：Agent 只在候选层改动，声明 scope/out_of_scope。
-6. **Validate**：只用 fixture、合成输入、临时输出目录；禁止写真实用户数据。
-7. **Review + Promote**：交叉 Agent 复核；用户批准或用户委托 Agent 后，才合入正式层。
-8. **Production Observation Window**：晋升后至少观察一个生产周期或一次真实调用；未闭合前不得把状态写成完全完成。观察窗必须显式闭合，不能只因为默认队列为空就视为完成。
+- `implementation_audit`：实现、审计、回滚、工程风险；
+- `independent_review`：独立反例、边界、回归风险；
+- `business_boundary`：业务价值、用户边界、流程合规。
 
-## 观察窗闭合策略
+2026-06-11 后进入 `approved`、`promoted`、`observation_window`、`closed` 的候选，manifest 必须记录 `validation.pre_promotion_reports[]`。报告可以有分歧；分歧本身也是证据。其他部署应在 `validation.review_policy` 中声明实际席位，而不是把不存在的 Hermes/Codex/Claude Code 硬填进去。
 
-`observation_window` 是仍需治理判断的状态，不是历史归档。候选晋升后满足下列任一条件，才可闭合：
+### 4.7 Coordinator Unified Brief
 
-- 至少一次真实调用或生产周期证明行为稳定；
-- Hermes/Codex 复核确认后续 drift 只来自已批准的兄弟候选晋升，且不代表当前候选语义丢失；
-- 用户明确确认该候选的实用目标已达成。
+Coordinator 收齐配置中要求的报告后，只向用户发一份统一简报。其他 agent 不再各自给用户重复汇总。详见第 5 章。
 
-闭合前必须记录：
+### 4.8 Promote and Observe
+
+用户批准后才可晋升。晋升前必须建 rollback point；晋升后必须更新 manifest：
+
+- `validation.status = observation_window`
+- `validation.promoted_by`
+- `validation.promoted_at`
+- `validation.formal_post_promotion`
+- `validation.post_promotion_safety`
+
+观察窗至少需要一次真实调用、一个生产周期、或用户/配置复核席位确认目标已达成，才能闭合。
+
+## 5. 统一晋升汇报
+
+### 5.1 原则
+
+旧方式：多个 agent 各自向用户汇报，用户看多份重复内容。
+
+新方式：配置中的复核席位各自评估，但最终面向用户的晋升建议由 coordinator 汇总为一份简报。
+
+这只改变呈报方式，不改变治理权力：
+
+- 配置中的复核席位仍各自报告；
+- evidence-not-authority 不变；
+- 用户最终决定不变；
+- 无用户批准不 formal promotion；
+- value-delta gate、rollback、observation window 不变。
+
+### 5.2 简报模板
+
+Coordinator 给用户的统一简报建议不超过一屏：
+
+```text
+候选：<candidate-id>
+目标：<one-line goal>
+
+复核结论：
+- <role>/<agent>：APPROVE / HOLD / REJECT — <one-line reason>
+- <role>/<agent>：APPROVE / HOLD / REJECT — <one-line reason>
+- <role>/<agent>：APPROVE / HOLD / REJECT — <one-line reason>
+
+价值增量：<positive delta summary>
+主要风险：<top risks or "none beyond observation window">
+阻塞项：<blocking issues or "none">
+回滚：<rollback readiness>
+建议动作：请用户批准晋升 / 要求修订 / 暂缓 / 拒绝
+
+证据位置：manifest / audit report / report message ids
+```
+
+### 5.3 分歧处理
+
+任一 required role HOLD 或 REJECT 时，coordinator 不粉饰分歧：
+
+- 如果是可修复实现问题，交回 implementer/auditor 修；
+- 如果是价值或边界问题，呈报用户裁决；
+- 如果最新报告从 HOLD 变 APPROVE，manifest 保留历史 HOLD，但 audit 以同一 reviewer 最新有效结论为准；
+- user/external 记录可以作为 info 并存；是否计入 `cross_reviewed_by = all` 由 `validation.review_policy.required_roles` 决定。
+
+## 6. 候选生命周期
+
+### 6.1 状态
+
+`validation.status`：
+
+- `draft`
+- `validated`
+- `review_pending`
+- `approved`
+- `promoted`
+- `observation_window`
+- `closed`
+- `rejected`
+
+`observation_window` 不是完成态。闭合前必须记录：
 
 - `closed_at`
 - `closure_reason`
@@ -114,502 +344,170 @@ python3 scripts/audit.py ~/.hermes/sublation/candidates/npl-monitor/<candidate-i
 - `closure_reviewed_by`
 - `closure_policy`
 
-并发观察窗按层级处理：先闭合 `skill-sublation` 框架候选，再闭合被治理对象候选；同层按 `promoted_at` 从早到晚处理。框架候选未稳定前，不应批量闭合依赖该框架语义的业务候选。
-
-使用 `lifecycle.py` 闭合观察窗：
-
-```bash
-python3 scripts/lifecycle.py close-observation \
-  ~/.hermes/sublation/candidates/<skill>/<candidate-id>/manifest.json \
-  --reason "真实调用稳定，后续 drift 来自已批准的兄弟候选" \
-  --evidence "audit warning reviewed; no semantic loss" \
-  --reviewed-by both
-```
-
-先用 `--dry-run` 预览。该命令只允许从 `observation_window` 转到 `closed`，并保留旧 `notes` 后追加闭合说明。
-
-## 晋升后安全网
-
-晋升不是终点。每个候选从 `approved` 进入正式技能后，必须先进入 post-promotion safety net，防止"扬弃完反而退化"。
-
-**必须记录到 `validation.post_promotion_safety`**：
-
-- `rollback_ready`: 已创建 rollback point，且 rollback path 可读。
-- `target_path_verified`: 晋升目标路径已确认属于当前 runtime/profile 的正式技能目录。
-- `source_path_matches_promotion_target`: 候选来源路径与实际晋升目标一致；如果不一致，必须写 `target_path_note` 说明跨 Agent 同步或 profile 差异。
-- `business_smoke_test.status`: `passed | pending | failed | not_required`。
-- `business_smoke_test.evidence[]`: 真实调用、半真实 fixture、人工复核报告或用户验收记录。
-- `fallback_verified`: 新合约、外部数据源或生成 backend 不可用时，是否会退回旧 workflow 或明确降级。
-- `old_capability_retained`: 原技能关键能力是否保留。
-
-**关闭观察窗前的最小门槛**：
-
-1. `rollback_ready == true`。
-2. `target_path_verified == true`。
-3. `business_smoke_test.status` 是 `passed` 或 `not_required`。
-4. 对业务技能，必须证明旧能力保留；对纯框架候选，必须证明后续候选已经使用过该框架能力。
-5. 有外部依赖的候选必须证明 fallback 或透明降级存在。
-6. 观察窗只能用 `lifecycle.py close-observation` 闭合；不得只手改 `status: closed`。
-
-这条规则来自 `canghe-comic` 路径错配事件：Codex 候选曾指向 Codex skill path，而 Hermes 生产侧实际使用 Hermes skill path。后续跨 Agent 晋升必须显式确认当前 runtime/profile 的正式路径，避免补丁合入了"另一个副本"。
-
-## 三房协作工作流（Hermes ↔ Codex ↔ 用户）
-
-sublation 全流程由 Hermes 和 Codex 分工执行，用户守生产门：
-
-| 阶段 | Hermes 负责 | Codex 负责 |
-|---|---|---|
-| Observe | 写入结构化观测 (`observe.py`) | — |
-| Classify | 区分 defect/optimization/discovery | — |
-| Candidate | 判定是否满足触发条件 | 创建候选副本 (`candidate.py`)，实现改动，生成 PATCH.diff |
-| Validate | 运行 `audit.py` 审计 | 编写 fixture / EVIDENCE.md / validation/RESULTS.md |
-| Review | 交叉复核，写入复核意见到 manifest | 响应 Hermes 复核意见，修改候选 |
-| Promote | — | 执行晋升（`user_delegated_agent_patch`）：合入 patch，更新 manifest，建 rollback point |
-| Observation | 验证生产稳定性，闭合观察窗 (`status: closed`) | — |
-
-**协作规则**：
-- Hermes 自主决定前与 Codex 商议，无分歧直接执行
-- 有分歧带报告找用户裁决
-- 用户审批报告 + 提要求，不参与逐步骤操作
-- Codex 超时（`max_iterations`）时 Hermes 接手完成纯机械步骤（应用 patch、更新 manifest、建 rollback point），不做新语义判断
-
-## 协作安全：委托到外部模型的数据隔离
-
-`delegate_task` 的 `context` 字段发送给外部模型（Codex/GPT-5.5），**绝不能**包含以下本地数据：
-
-- ❌ 本地文件内容（代码、config、笔记正文）
-- ❌ 文件路径清单（即使只是路径也会暴露目录结构）
-- ❌ 案件信息、客户数据、私密文档
-- ❌ workspace 目录树摘要
-- ❌ 用户真实文件系统中的任何内容摘要
-
-**正确做法**：`context` 只传任务描述、明确的任务参数（如候选ID、分支名）、和抽象化的技术上下文（如"需要在 audit.py 的 strict_checks 函数中增加一个检查项"）。需要的文件内容由 Codex 在自己 session 中自行读取——不提前推送。
-
-违反这条边界的后果：外部模型在无用户直接授权的情况下获取了本地文件系统信息。
-
-## 外部评估器接入：Darwin Adapter
-
-Darwin 类 skill 的定位是 **外部评估器**，不是晋升者、不是正式技能编辑器。它可以为候选副本生成评分卡、test prompts、反向审计意见和改进建议，但不能绕过 sublation 的候选层、审计层、交叉复核和用户审批。
-
-**硬约束**：
-
-- Darwin 只能读取或评估 `~/.hermes/sublation/candidates/<skill>/<candidate-id>/` 下的候选副本。
-- Darwin 不得直接修改 active skill path 下的正式技能目录。
-- Darwin 的输出只能作为 `external_evaluations[]` 参考证据写入 manifest，不能把候选状态直接改成 `approved`、`promoted`、`observation_window` 或 `closed`。
-- Darwin 若提出改写方案，必须生成 proposal/report，由 Codex/Hermes 在候选层手动吸收；不得由 Darwin 自行应用到正式技能。
-- Darwin 使用 git ratchet 时，只能作用于候选副本或临时测试副本；正式晋升仍以 sublation 的 rollback point、manifest 和用户授权记录为准。
-
-**推荐接入方式**：
-
-```json
-{
-  "external_evaluations": [
-    {
-      "evaluator": "darwin-skill",
-      "target": "candidate",
-      "mode": "read_only_scorecard",
-      "report_path": "validation/darwin-scorecard.json",
-      "formal_skill_modified": false,
-      "notes": "Darwin score is reference evidence only; promotion still requires audit/review/user approval."
-    }
-  ]
-}
-```
-
-当候选涉及跨技能吸收、合并或从外部 skill 借鉴能力时，manifest 必须记录 `rights_provenance`。这不是形式主义，而是把"吸收思想/接口/流程"和"复制受保护表达或源文件"分清楚：
-
-- 只吸收思想、流程、接口、质量标准：通常记录为 `expression_copied: false`。
-- 复制 `SKILL.md` 段落、脚本、模板、素材、图片、配置：必须记录 license / permission basis，并进入人工复核。
-- donor skill 的来源、路径、许可状态不明时，不得默认可复制；只能做 proposal 或抽象化重写。
-
-详见 [references/darwin-evaluator-adapter.md](references/darwin-evaluator-adapter.md)。
-
-## 业务烟雾测试
-
-晋升后、关闭观察窗前，必须用 [业务烟雾测试模式](references/business-smoke-test-pattern.md) 验证被扬弃的技能在用户实际运行时仍能工作。audit 证明结构正确，烟雾测试证明操作正确。
-
-## Pitfalls
-
-- **Codex 需要 git 仓库**：委托 Codex 执行合并或晋升任务时，工作目录必须是 git 仓库（`git init`），否则 Codex 拒绝运行并返回 "Not inside a trusted directory"。子仓库的 sublation workspace 初始化后记得 `git add -A && git commit`。
-
-- **Codex 内联提示词中的单引号**：通过 `terminal` 工具传入 Codex 的合并提示词如果包含单引号（如 `don't`、`it's`、中文引号 `'`），bash 会报告 `unexpected EOF while looking for matching`。**正确做法**：将提示词写入临时文件（如 `/tmp/codex-prompt.txt`），再用 `~/.local/bin/codex exec "$(cat /tmp/codex-prompt.txt)"` 传入。不要在 terminal 命令中内联复杂的多行提示词。
-
-- **吸收≠低位阶**：看到两个同域技能时，不要默认"功能少的那个是低位阶"。先读双方 SKILL.md 的实际内容，确认哪一方有另一方缺失的局部优势（如运行时适配、平台约束处理、特定坑位的解决方案）。吸收的正确口径是"target 大体系吸收 donor 的局部经验"，不是"低位阶被吞掉"。如果 donor 全面落后于 target，用 `close-superseded` 而非吸收。
-
-- **`close-superseded` 覆盖旧 notes**：`lifecycle.py close-superseded` 的 `--reason` 参数直接覆写 manifest 的 `validation.notes` 字段，不保留旧值。如果旧 manifest 有重要上下文（如审计结果、复核意见），先人工检查再执行 `--dry-run` 预览。
-
-- **顺序晋升导致 `formal_post_promotion` hash 漂移**：当多个候选依次晋升并修改同一文件（典型是 `SKILL.md`），早期候选记录的 `validation.formal_post_promotion.files` hash 会被后续候选的晋升覆盖。`strict_formal_post_promotion_current` 必须按 `validation.status` 判断语义：`closed`、`rejected` 或 superseded 历史候选只报 `WARNING`，表示可能是后续合法晋升造成的记录漂移；`promoted` 或 `observation_window` 仍报 `FAIL`，因为观察窗内候选必须与当前正式状态保持一致。不要因为已关闭历史候选的 warning 回滚正式技能；如需消除警告，再人工更新 manifest 并说明漂移原因。
-
-- **Codex 超时恢复**：当 Codex 通过 `delegate_task` 执行被委派的晋升任务时，可能因为迭代次数上限（`max_iterations`）在晋升步骤完成前退出。此时 Hermes 应检查候选状态：如果候选已通过审计且所有文件改动已完成，Hermes 直接接手完成纯机械步骤——应用 PATCH.diff、更新 manifest 的 `validation` 字段、创建 rollback point。不要重新委派 Codex（会重复工作），不要做新的语义判断（那是 Codex 的领域）。
-
-- **PATCH.diff 格式兼容性**：候选的 PATCH.diff 可能带 bare `@@` 行（缺行号），导致 `git apply` 和 `patch` 命令失败。strict audit 必须在晋升前阻断 bare `@@` 和其他非法 hunk header；旧候选若已带坏 diff，先修 PATCH.diff 再晋升。
-
-- **跨 Agent 晋升路径错配**：当 Codex 在自己的 skill 副本（如 `~/.codex/skills/`）上创建和晋升候选时，`source_skill.path` 可能指向 Codex 副本而非 Hermes 生产副本（如 `~/.hermes/skills/`）。晋升后必须验证正式技能目录确实被修改——`post_promotion_safety.target_path_verified` 和 `source_path_matches_promotion_target` 就是为这个坑设计的。首例：`canghe-comic` 候选晋升到了 Codex 目录，Hermes 目录的 SKILL.md 未被修改，业务验证时才暴露。
-
-- **框架审计全过≠业务技能能跑**：strict audit 22 项全部通过只证明候选结构正确。晋升后必须跑业务烟雾测试（至少 dry-run：检查合约章节存在、workflow 步骤完整、关键能力字面保留）。不要把"audit passed"当成"发布就绪"。在 post-promotion safety net 制度化之前，这个教训代价是一个跨 Agent 路径错配 bug。
-
-- **未入账的内容变更（unledgered formal drift）**：当正式 SKILL.md 或 references 中出现新内容，但没有任何候选 manifest 记录其变更链路时，这是治理账本缺口。对于 sublation 自身来说尤其敏感——治理框架自己的变更必须可审计。修复方式：建 backfill 候选，manifest 标注 `closure_reason: "backfill — content already validated in production; this candidate retroactively documents the governance trail"`，记录 scope、evidence、closure 信息后立即闭合。backfill 不是造假，是补录——内容已经生效且验证通过，差的是纸面记录。不要因为"内容没问题"就跳过补账；sublation 的信用来自每一条变更都可追溯到候选→审计→复核→晋升链路。
-
-- **GitHub 公开发布前的清理与审计**：如果技能要作为独立 repo 发布到 GitHub，必须先过发布清理检查（见 `references/github-release-checklist.md`），然后完成 Codex+Hermes 联合审计并出具 `JOINT-AUDIT.md`（见 `references/pre-release-audit-pattern.md`），用户审批后才推送。完整发布流程见 `references/v1.0-release-process.md`。核心清理项：`__pycache__` 污染、`.orig` 备份文件、硬编码的个人路径、references 中的内部样本标注。联合审计项：内容完整性、隐私/安全、脚本健康、文档质量、结构、治理自洽。发布清理和审计不替代 sublation 治理——先补账再清理再审计。
-
-- **gh auth 跨 session 认证失败 + publish.sh 工作模式**：Hermes 终端 session 无法访问用户本地 macOS 钥匙串中 `gh auth login` 存储的 token，导致 `gh auth status` 始终显示未登录。**不要反复重试 `gh auth login`**——改用 `publish.sh` 脚本模式：将 `git remote add`、`gh repo create --push` 等命令写入 `publish.sh`，让用户在本地终端直接执行。脚本用 `set -e` 确保任何步骤失败立即停止。
-
-## 晋升前清洁检查
-
-候选通过 audit 之后、正式晋升之前，必须做一次 promotion-readiness 检查：
-
-- **正式文本口径**：将 `候选`、实验编号、临时注释等只属于候选层的标记移出将要晋升的正式内容；必要时保留在 `RATIONALE.md`、`EVIDENCE.md` 或 `PATCH.diff`。
-- **相邻工作拆分**：如果复核中发现新的后续工作，把它写成下一个候选的待办，不要顺手塞进当前候选。例如完成标准和 provider contract 应分成两个候选。
-- **manifest 同步**：复核人、复核结论、audit 状态、promotion mode、用户授权状态必须与事实一致。
-- **最终 diff 检查**：晋升前确认 diff 只包含本候选 scope 内的文件和语义；脚本、配置、cron、真实数据输出不能被 spec-patch 顺带改动。
-
-如果清洁检查发现问题，优先小修候选并重新 audit；不要为了赶晋升把候选层术语或未复核的相邻功能带进正式技能。
-
-## strict audit 检查
-
-默认 strict audit 在基础结构检查之外，还必须检查：
-
-- **残留候选标签**：`PATCH.diff` 新增正式内容里不得出现 `（005a 候选）`、`(candidate)` 等候选层标题标记。
-- **PATCH.diff 格式**：`PATCH.diff` 的 hunk header 必须是标准 unified diff 形式，例如 `@@ -12,3 +12,4 @@`；bare `@@` 或缺失行号的 hunk header 是 blocking `FAIL`。
-- **spec-patch scope**：`spec-patch` 不得改动 `scripts/`、`config/`、`fixtures/`、`schemas/` 等运行面文件。
-- **正式基线新鲜度**：晋升前，manifest 记录的 `source_skill.files` 必须与当前正式技能目录一致，避免旧候选晋升时误删新文件。
-- **晋升后正式状态**：候选进入 `promoted`、`observation_window` 或 `closed` 后，不再用旧 `source_skill.files` 反查正式目录；改用 `validation.formal_post_promotion.files` 确认晋升记录与当前正式状态一致。`promoted` / `observation_window` 漂移是 blocking `FAIL`；`closed`、`rejected` 或 superseded 历史候选漂移是 non-blocking `WARNING`。
-- **manifest 自洽**：`auditor_status`、`cross_reviewed_by`、`promotion_mode`、`status`、`promoted_by/promoted_at` 必须互相一致。
-- **跨技能关系自洽**：如果 manifest 写入 `relationships`，必须满足 pattern 枚举、target 必填、cross-skill absorption 至少一个 donor、donor 与 target 不得同名同路径、donor 必须声明 `absorbed_capability`。
-- **外部评估器自洽**：如果 manifest 写入 `external_evaluations`，Darwin 等外部评估器只能以 `target: candidate` 和 `mode: read_only_scorecard|proposal_only|dry_run` 进入；报告路径必须在候选目录内，且必须声明未修改正式技能。
-- **权利来源自洽**：如果 manifest 写入跨技能 donor 关系，必须记录 `rights_provenance`；新候选缺失该字段是 blocking `FAIL`，历史已晋升候选缺失该字段只作为 warning 处理。
-- **晋升后安全网自洽**：如果 manifest 写入 `validation.post_promotion_safety`，必须满足 rollback、路径确认、smoke test、fallback 和旧能力保留记录的自洽性。`closed` 候选缺安全网字段是 warning；安全网字段存在但显示失败是 blocking `FAIL`。
-
-## 候选生命周期管理
-
-候选目录不是待办池；只有仍需决策的候选才进入默认决策队列。使用 `scripts/lifecycle.py` 管理候选状态：
-
-```bash
-python3 scripts/lifecycle.py scan
-```
-
-默认只列出 `queue`：`active` 与 `stale-active`。查看所有历史候选：
-
-```bash
-python3 scripts/lifecycle.py scan --state all
-```
-
-观察窗健康扫描：
-
-```bash
-python3 scripts/lifecycle.py health --warn-after-days 7
-```
-
-`health` 只读扫描，不写 manifest。它必须暴露：
-
-- 仍处于 `observation_window` 的记录；
-- 已 `closed` 但缺少 `closed_at`、`closure_reason`、`closure_evidence[]`、`closure_reviewed_by` 或 `closure_policy` 的记录；
-- 超过阈值仍未闭合的观察窗。
-
-对策略生效前已经闭合的历史记录，可以显式传入 cutoff，把旧 closure metadata 缺口从当前故障中分离出来：
-
-```bash
-python3 scripts/lifecycle.py health \
-  --waive-legacy-closed-metadata-before 2026-05-27T17:22:01Z \
-  --include-waived
-```
-
-waived 记录会进入 `waived_issues`，不计入 `total_issues`，也不会触发 `--fail-on-issues`。cutoff 必须显式传入，避免默认掩盖新产生的缺字段记录。
-
-生命周期状态：
-
-| 状态 | 含义 | 默认进入决策队列 |
-|---|---|---|
-| `active` | `draft`、`validated`、`review_pending` 或 `approved`，且基线仍新鲜 | 是 |
-| `stale-active` | 仍待决策，但 `source_skill.files` 已落后于正式技能 | 是，需先 rebase |
-| `promoted` | 已晋升但尚未进入明确观察窗，或历史 promoted 记录 | 否 |
-| `observation-window` | 已晋升且仍需闭合判断 | 否，但必须进入健康扫描 |
-| `closed` | 观察窗已闭合，后续 drift 按历史记录处理 | 否 |
-| `superseded` | 被后续候选吸收，不应再晋升 | 否 |
-| `rejected` | 明确驳回或关闭 | 否 |
-| `legacy` | 缺 v3 字段或历史字段不完整 | 否，需人工迁移 |
-| `invalid` | manifest 无法解析 | 否，需人工修复 |
-
-`superseded` 不作为 `validation.status` 新枚举写入，避免破坏 v3 schema。正式记录方式是：
-
-```json
-{
-  "validation": {
-    "status": "rejected",
-    "promotion_mode": "none",
-    "rejection_reason": "obsolete_superseded",
-    "superseded_by": "<new-candidate-id>"
-  }
-}
-```
-
-标记旧候选被新候选吸收：
-
-```bash
-python3 scripts/lifecycle.py close-superseded \
-  ~/.hermes/sublation/candidates/<skill>/<candidate-id>/manifest.json \
-  --superseded-by <new-candidate-id>
-```
-
-闭合观察窗：
-
-```bash
-python3 scripts/lifecycle.py close-observation \
-  ~/.hermes/sublation/candidates/<skill>/<candidate-id>/manifest.json \
-  --reason "<why this observation window can close>" \
-  --evidence "<production call, review note, or drift explanation>" \
-  --reviewed-by hermes \
-  --dry-run
-```
-
-### Legacy manifest 迁移规划
-
-历史候选如果仍是 v2 或缺少 v3 必填字段，不应直接批量改写。先生成只读迁移规划：
-
-```bash
-python3 scripts/lifecycle.py plan-legacy
-```
-
-输出只是一份计划，不写任何 manifest。计划中每条记录必须包含：
-
-- `action`: `plan_v3_migration`、`skip` 或 `manual_repair`
-- `write_allowed: false`
-- `confidence`
-- `proposed.schema_version`
-- `proposed.candidate_type`
-- `proposed.validation`
-- `blocked_reasons`
-
-如果 `blocked_reasons` 非空，表示该条历史记录需要人类或交叉 Agent 复核后才能迁移。
-
-## 候选类型
-
-| 类型 | 用途 | 常见验证 |
-|---|---|---|
-| `spec-patch` | 只改 `SKILL.md` 或文档规范 | diff + 人工语义审查 |
-| `script-enhance` | 改脚本行为或输出契约 | fixture + 临时输出 |
-| `infra-fix` | workdir、cron、profile、配置路径 | 配置检查 + 不写真实数据 |
-| `tooling` | 改 sublation 自身脚手架/审计工具 | 语法检查 + fixture/dry-run |
-
-## manifest v3 要点
-
-`manifest.json` 必须包含：
-
-- `schema_version: 3`
-- `candidate_type`
-- `source_skill.files` 和 `rollback_hashes`
-- `scope.changes` / `scope.out_of_scope`
-- `validation.auditor_status`: `passed | conditional | failed`
-- `validation.cross_reviewed_by`: `none | hermes | codex | both | user-waived`
-- `validation.promotion_mode`: `none | human_patch | user_delegated_agent_patch | rollback`
-- `validation.status`: `draft | validated | review_pending | approved | promoted | observation_window | closed | rejected`
-- 观察窗闭合字段：`closed_at`、`closure_reason`、`closure_evidence[]`、`closure_reviewed_by`、`closure_policy`
-- 跨技能关系字段（可选）：`relationships.sublation_pattern`、`relationships.target_skill`、`relationships.donor_skills[]`
+### 6.2 候选类型
+
+- `spec-patch`：只改文档、schema、流程说明或规则文本；
+- `script-enhance`：改脚本逻辑；
+- `infra-fix`：修调度、路径、配置、运行环境；
+- `tooling`：新增或修改治理工具。
+
+spec-patch 不等于低风险；如果改变晋升规则、删除能力或扩大权限，仍需配置中要求的复核报告和用户批准。
+
+### 6.3 Manifest v3 要点
+
+关键字段：
+
+- `source_skill.path/tree_hash/files`
+- `candidate.path/tree_hash/files`
+- `rollback_hashes`
+- `scope.changes`
+- `scope.out_of_scope`
+- `relationships`
+- `rights_provenance`
+- `validation.value_delta`
+- `validation.empirical_scorecard`
+- `validation.pre_promotion_reports[]`
+- `validation.review_policy`
+- `validation.formal_post_promotion`
+- `validation.post_promotion_safety`
+
+常见枚举：
+
+- `cross_reviewed_by`: `none | hermes | codex | both | claude-code | all | configured | user-waived`
+- `promotion_mode`: `none | human_patch | user_delegated_agent_patch | rollback`
+- `empirical_scorecard.status`: `measured | not_applicable | not_measured`
+- `relationships.sublation_pattern`: `single_skill_patch | cross_skill_absorption | skill_merge_plan | skill_split_plan`
+
+`validation.review_policy` 可声明默认三 agent、多 agent 替代、单 agent 或用户豁免模式。没有该字段时，audit 保持本地默认三席：`claude-code`、`codex`、`hermes`。任何非默认模式必须记录用户授权证据。
 
 完整 schema 见 `schemas/manifest-v3.json`。
 
-## 观测 schema
 
-观测记录使用 `schemas/observation-v3.json`。核心字段：
+### 6.4 决策历史与非作者复跑
 
-- `classification`: `clean | partial | defect | critical`
-- `reflection_type`: `DISCOVERY | OPTIMIZATION | SKILL_DEFECT | EXECUTION_LAPSE`
-- `recommendation`: `obs_only | flag_for_review | create_candidate`
-- `step_details[]`: 记录具体步骤、证据、置信度
+2026-06-11 后的新候选应把复核、修订和观察窗学习写成可追溯因果链：
 
-## 设计模式
+- `validation.decision_history[]`：记录 `diagnosis -> action -> evidence -> outcome`，并用 `trigger.id` 链接报告、审计、用户决定或观测。
+- `validation.independent_reproduction`：晋升前至少一名非作者复跑。初始门槛为一人；若再次出现镜像漂移或复核逃逸事故，再提高到两人。
+- `validation.rejected_alternatives[]`：只记录有意义的设计分叉、spec-patch、吸收、review conflict 或 routing 取舍；小修小补不强制。
+- `redacted_reporting`：在 manifest 顶层标注可共享证据与本地敏感上下文，登录墙、cookie path、page body、用户数据等不得直接进入用户简报。
 
-### Provider Contract（direct / mcp / disabled）
-外部数据源不绑定特定实现。详见 `references/provider-contract-pattern.md`。npl-monitor 005a 首次应用。
+`observation_window` 的后续学习也写入 `decision_history[]`，使用 `phase: observation_window`，不要另造平行四元组。缺少 `decision_history[]` 的 post-rule 晋升候选先给三个月 warning 过渡，再升级为 hard fail。
 
-### 跨技能吸收（Cross-Skill Absorption）
+### 6.5 Strict Audit
 
-当两个技能在同一领域重叠、但各有优势时，sublation 不只处理"单技能内部改进"——也处理"一个技能吸收另一个技能的局部经验"。这更接近黑格尔 Aufhebung 的本义：保留、超越、提升，而非消灭。
+默认 `audit.py` 是 strict。晋升前不要用 `--no-strict` 逃避问题。重点检查：
 
-**吸收模型**：
+- 候选不在 formal path；
+- 无 bytecode；
+- PATCH.diff hunk header 合法；
+- source baseline 未漂移；
+- formal_post_promotion 当前；
+- manifest 自洽；
+- rights/provenance；
+- post-promotion safety；
+- empirical scorecard；
+- value_delta；
+- pre_promotion_reports。
 
-```
-donor skill (只读) ──提取局部优势──→ target skill (候选层修改)
-                                          │
-                                    candidate manifest 记录 donor 关系
-                                          │
-                                    验证 donor 零影响
-                                          │
-                                    晋升只改 target
-```
+### 6.6 顺序晋升和漂移
 
-**核心约束（三方基本规则）**：
+同一 skill 的多个候选依次晋升时，后一个候选可能改变前一个候选记录的正式快照。观察窗内候选出现 `formal_post_promotion` drift 必须解释：刷新快照、缩小检查范围、闭合观察窗或创建治理候选。不要为了消除 warning 回滚已批准的正向晋升。
 
-1. **不误伤原则**：donor skill 在 sublation 全程保持完整可用，只读不写。任何步骤不得修改 donor 的任何文件。
-2. **吸收不删除**：target skill 接收 donor 的经验，donor 不做任何修改、删除或降级。吸收完成后 donor 仍可独立使用。
-3. **第一轮只做 spec-patch**：跨技能吸收首轮不改 scripts/、不生成实际产出（如图片/PDF），只改 SKILL.md + references。等 spec-patch 稳定后，后续候选可以扩展到脚本层。
+### 6.7 候选层镜像漂移
 
-**验证要点**：
-- diff 确认 donor 目录无任何变化（`git diff --stat <donor-path>` 为空）
-- manifest 的 `relationships` 必须声明 target skill、donor skill、吸收模式和具体吸收能力
-- 晋升前 strict audit 额外检查：donor skill 目录与 baseline hash 一致
+候选层也会发生路径错配。工作区 audit passed 不等于共享根 audit passed。进入 coordinator unified brief 前必须确认：
 
-**manifest relationships 格式**：
+- workspace candidate 与 shared-root candidate 的关键文件一致；
+- shared-root candidate 也能通过 strict audit；
+- **audit report 的 `candidate_path` 必须指向共享根，而非 agent workspace**——如果 audit report 里的 `candidate_path` 是 Codex/Claude Code 的本地工作区路径，说明该 audit 从未在共享根上跑过，不得采信为"共享根已通过"；
+- `PATCH.diff` 能在当前 formal baseline 上 dry-run/apply-check；
+- 删除文件不会留下零字节空壳；
+- 报告中的 line count、hash、audit 数字来自实测。
 
-```json
-{
-  "relationships": {
-    "sublation_pattern": "cross_skill_absorption",
-    "target_skill": {
-      "name": "canghe-comic",
-      "path": "~/.codex/skills/canghe-comic"
-    },
-    "donor_skills": [
-      {
-        "name": "baoyu-comic",
-        "path": "~/.codex/skills/baoyu-comic",
-        "absorbed_capability": "Hermes prompt-only image generation contract",
-        "retained_boundary": "donor remains read-only and independently usable"
-      }
-    ],
-    "note": "Preserve target workflow; absorb donor runtime contract."
-  }
-}
-```
+这条是 post-promotion strong path check 在候选层的等价护栏。
 
-`relationships` 是候选级元数据，不表示 donor 被替换、删除或降级。`cross_skill_absorption` 必须至少有一个 donor，且 donor 的 `name` / `path` 不得与 target 相同。
+**常见漂移模式**：agent 在工作区删除 `__pycache__`/`.pyc` 后跑 audit → audit passed，同步到共享根时遗漏了删除动作 → 共享根 audit 仍显示 passed（如果 audit script 的 bytecode 检测不覆盖该路径），但 `find` 仍能找到残留字节码。检测方法：`find <shared-root> \( -name '__pycache__' -o -name '*.pyc' \) -print`，不应依赖 audit 的 `no_bytecode_artifacts` 单点。
 
-**何时使用吸收 vs 单技能改进**：
+## 7. 设计模式
 
-| 信号 | 模式 |
-|------|------|
-| 两个技能在同域有重叠功能 | 跨技能吸收 |
-| 一个技能有另一个缺少的运行时适配（如 Hermes vs 通用工具约束） | 跨技能吸收 |
-| 只有一个技能需要改进，无外部参考 | 单技能改进 |
-| donor 明显是 target 的上位替代 | 不是吸收，是候选 superseded |
+### 7.1 Provider Contract
 
-**反模式**：不要把"吸收"当成"donor 低位阶被吞掉"。吸收的前提是 donor 有 target 值得学习的局部优势——如果 donor 全面落后，应该用 `close-superseded` 标记而非吸收。吸收的价值在于双方各有值得保留的东西。
+数据源技能必须区分：
 
-首例：`canghe-comic ← baoyu-comic`（canghe 吸收 baoyu 的 Hermes prompt-only 适配经验），详见 `references/cross-skill-absorption-canghe-baoyu-comic.md`。
+- `ok`：数据源正常；
+- `empty`：正常为空；
+- `blocked`：来源阻断；
+- `login_required`：需要人工登录；
+- `captcha_pending`：需要用户完成验证码；
+- `disabled`：明确停用；
+- `mcp_placeholder`：预留接口，不追踪为缺陷。
 
-### 技能合并（Skill Merging）
+参考 `references/provider-contract-pattern.md` 和 `references/human-in-the-loop-login-wall.md`。
 
-当两个或更多技能在同一领域互补且各有脚本/工具时，不是吸收（donor→target），而是**合并成一颗新技能**。合并后的技能覆盖所有输入技能的使用场景，但更简洁、更强、入口统一。
+### 7.2 Cross-Skill Absorption
 
-**何时合并 vs 吸收**：
+吸收不是吞并。target 吸收 donor 的局部优势，同时保留 target 的主结构和 donor 的关键能力。必须记录：
 
-| 信号 | 模式 |
-|------|------|
-| 多个技能做同一件事（如四种 OCR 引擎） | 合并 |
-| 技能形成天然管道（URL→MD→格式化MD→HTML） | 合并 |
-| 技能是同一动作的不同平台后端（微信发布 / X 发布） | 合并 |
-| 一个技能有另一个缺少的局部优势 | 跨技能吸收 |
-| 只有一个技能需要改进 | 单技能改进 |
+- donor skill；
+- absorbed capability；
+- retained boundary；
+- rights/provenance；
+- fallback；
+- 用户批准删除或 alias 改动。
 
-**合并方法论**（详见 `references/merge-driven-sublation.md`）：
+参考 `references/cross-skill-absorption-canghe-baoyu-comic.md` 和 `references/absorbed-target-routing.md`。
 
-1. **筛选**：扫描技能库，找出有实际脚本（.py/.sh/.ts）的功能性技能；纯文档技能合并价值低，跳过。
-2. **聚类**：按功能域分组（OCR、格式转换、发布、技能管理等），评估合并价值（互补性、覆盖面、减负效果）。
-3. **委托**：将聚类后的合并簇批量委托给 Codex，每个簇给一个合并任务（读源技能→分析重叠→设计合并方案→产出合并 SKILL.md）。
-4. **收尾**：Codex 产出的合并候选进入标准 sublation 候选层（audit → review → promote → observation window）。
+### 7.3 Skill Merge and Split
 
-**合并成功的标准**：
-- 输入技能数 > 输出技能数（做了减法）
-- 合并后功能覆盖所有输入场景，无退化
-- 用户使用时只需一个入口，不用纠结选哪个
+合并候选必须证明：
 
-**合并产出复核清单**（Hermes 审核 Codex 合并产出时必须逐项检查）：
+- 合并后入口更清；
+- 旧 workflow 有映射；
+- 能力没有静默收缩；
+- donor 删除另行批准；
+- 观察窗可以覆盖主要路径。
 
-1. **功能完整性**：所有源技能的核心功能是否在合并技能中保留？对照源 SKILL.md 逐项确认。
-2. **入口统一**：是否有清晰的决策树/路由表，让 Agent 根据用户意图自动选择正确的工作流？
-3. **脚本适配**：合并后的脚本是否通过了语法验证（`python3 -m py_compile` / `node --check`）？路径引用是否已更新？
-4. **配置统一**：多个源的配置是否已合并到统一的 `config/` 下，避免用户需要维护多份 `.env`？
-5. **降级策略**：如果某个引擎/后端不可用，合并技能是否明确说明降级路径，而非静默失败？
-6. **元数据一致**：`absorbs` 字段是否在 SKILL.md 顶层而非嵌套在 `metadata` 内？`version`、`author`、`homepage` 是否已从源技能继承/修正？
-7. **不误伤**：合并候选只存在于 `candidates/<name>-merge/`，源技能目录完全未触碰。
+拆分候选必须证明拆分降低复杂度，而不是制造更多治理对象。
 
-**首轮应用**（2026.5.28，15→5，减负 67%）：
-- OCR 管道：`ocr-and-documents + mineru-ocr + paddleocr-doc-parsing + paddle-ocr` → `document-ocr`（4→1）
-- 格式转换：`canghe-url-to-markdown + canghe-format-markdown + canghe-markdown-to-html + markitdown` → `universal-converter`（4→1）
-- 内容发布：`canghe-post-to-wechat + canghe-post-to-x` → `content-publisher`（2→1）
-- 技能管理：`skill-creator + skill-manager` → `skill-lifecycle`（2→1）
-- 媒体工具：`universal-media-downloader + douyin-batch-download + video-compressor` → `media-toolkit`（3→1）
+### 7.4 Spec-Only Candidate
 
-**第二轮应用**（2026.5.28，17→6）：
-- 语音转文字：`funasr-transcribe + tingwu-asr` → `speech-to-text`（2→1，本地/云端自动路由）
-- 文档生成：`docx + md2word + docx-generator` → `document-generator`（3→1，markdown→专业docx管道）
-- 法律研究枢纽：`legal-research + yuandian-law-search + zhihe-legal-research` → `legal-research-hub`（3→1，多数据源统一入口）
-- 法律文档摄入：`legal-text-format + wechat-article-fetch` → `legal-document-ingest`（2→1，抓取→格式化管道）
-- 股票工作台：`stock-daily-analysis + claude-stock-fundamental-analysis + claude-stock-earnings-analysis + claude-stock-morning-note + claude-stock-dcf-valuation` → `stock-workspace`（5→1，技术面+基本面+估值合一）
-- 合同审查：`contract-copilot + claude-commercial-contract-review` → `contract-review`（2→1，17脚本引擎+审查框架）
+纯文档候选也要有价值增量。典型用途：
 
-**累计**：两轮 32→11，总量 -66%。
+- 补治理账本；
+- 明确边界；
+- 归档过时经验；
+- 更新汇报/复核流程；
+- 将分散规则收束到 reference。
 
-### 跨技能吸收的权利与许可（Rights & Provenance）
+### 7.5 External Evaluator Adapter
 
-跨技能吸收涉及两个独立的技能，必须尊重各自的权利来源。manifest 的 `relationships.donor_skills[]` 应记录以下字段以防止误伤原作者权益：
+外部评估器只能读候选、产报告、给风险评分。禁止安装时写 formal skill，禁止 optimizer/sync/load_skill 自动落地。参考 `references/external-evaluator-adapter-agent-insight.md` 和 `references/darwin-evaluator-adapter.md`。
 
-```json
-{
-  "donor_skills": [
-    {
-      "name": "baoyu-comic",
-      "path": "/path/to/donor",
-      "absorbed_capability": "Hermes prompt-only contract",
-      "rights": {
-        "license": "MIT",
-        "provenance": "https://github.com/JimLiu/baoyu-skills",
-        "absorbed_expression": false,
-        "absorbed_category": "interface_contract"
-      }
-    }
-  ]
-}
-```
+### 7.6 Business Smoke Test
 
-| 字段 | 含义 |
-|------|------|
-| `license` | donor 的开源许可（MIT/Apache-2.0/AGPL-3.0 等） |
-| `provenance` | donor 的原始来源 URL |
-| `absorbed_expression` | 是否复制了受版权保护的表达性内容（代码、文本段落）；`false` 表示只吸收思想/流程/接口契约 |
-| `absorbed_category` | 吸收内容的类型：`interface_contract`（接口契约）、`workflow_pattern`（流程模式）、`style_profile`（风格配置）、`runtime_adapter`（运行时适配） |
+框架 audit 全过只证明结构正确，不证明业务可用。晋升后必须跑业务烟雾测试，至少覆盖：
 
-吸收精神：**优先吸收思想、流程和接口契约，避免直接复制受保护的表达性内容。** 如果必须复制代码或大段文本，`absorbed_expression` 设为 `true` 并在 RATIONALE.md 中说明合理性。
+- 合约章节存在；
+- workflow 步骤完整；
+- 关键能力字面保留；
+- 正/负 fixture；
+- 真实路径最小调用。
 
-### 外部评估器集成（Evaluator Adapter）
+参考 `references/business-smoke-test-pattern.md`。
 
-sublation 的治理框架可以集成外部质量评估器（如 Darwin Skill、SkillLens）。核心原则：**评估器负责"变异和评分"，sublation 负责"晋升和生杀"。**
+### 7.7 Upstream Sync
 
-```
-正式技能
-  ↓ 只读观察
-sublation 创建候选副本
-  ↓
-外部评估器对候选打分/提出优化建议（只读，不写）
-  ↓
-sublation audit 严审（评估报告作为参考证据，不替代 audit）
-  ↓
-Hermes/Codex 复核
-  ↓
-用户批准后晋升
-```
+对外部来源或上游 repo 做 sublation 前，先确认本地不是旧版本。`hermes skills update` 对 local source 返回 No updates 不代表最新。需要 clone/diff/rollback 证据。参考 `references/upstream-skill-sync-methodology.md`。
 
-**评估器适配的约束**：
+### 7.8 发布前清理
 
-1. **只能作用于候选副本**：评估器永远不能直接修改正式技能目录。如果评估器设计上会编辑文件，必须限制其工作在 `~/.hermes/sublation/candidates/<skill>/<candidate-id>/` 下。
-2. **评分报告作为参考证据**：audit.py 可以引用外部评估器的评分报告作为晋升证据，但评分不能替代 audit 检查或交叉复核。
-3. **运行时中立**：评估器不得硬编码特定平台的路径（如 `.claude/skills`），必须适配到 Hermes/Codex 的 skill root 相对路径。
-4. **git 假设隔离**：评估器自带的 git 工作流不应与 sublation 的 rollback-points + manifest hash 回滚机制冲突。两套机制独立运行。
+发布到 GitHub 或公开分发前，必须清理：
 
-适用于：集成 `darwin-skill` 等外部评估器到 sublation 流程中。
+- `__pycache__`、`.pyc`、`.orig`；
+- 个人路径和内部样本；
+- 过时候选；
+- 未入账正式漂移；
+- README、LICENSE、audit report。
 
-## 实战案例
-
-NPL monitor 三个闭环实验保存在 `references/`：
-
-- `experiment-001-npl-cron-failure.md`: `spec-patch`
-- `experiment-002-script-status-fixture.md`: `script-enhance`
-- `experiment-003-cron-workdir-contract.md`: `infra-fix`
-
-canghe-comic / canghe-article-illustrator / canghe-infographic 三连吸收（`cross_skill_absorption`，从 baoyu-* 吸收 Hermes prompt-only 适配经验）是第一种跨技能 sublation 样本。首例文档见 `references/cross-skill-absorption-canghe-baoyu-comic.md`。
-
-以后不要让 NPL 继续占主线。新增实验使用 `references/experiment-template.md`，把具体技能当样本，不当框架本身。
-
-## 系统健康扫描
-
-定期系统健康扫描工作流见 `references/system-health-scan-workflow.md`。
+参考 `references/github-release-checklist.md`、`references/pre-release-audit-pattern.md`、`references/github-release-workflow.md`。

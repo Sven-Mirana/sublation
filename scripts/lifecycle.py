@@ -26,7 +26,7 @@ ALL_STATES = {
     "all",
 }
 VALID_STATUSES = {"draft", "validated", "review_pending", "approved", "promoted", "observation_window", "closed", "rejected"}
-VALID_CROSS_REVIEWERS = {"none", "hermes", "codex", "both", "user-waived"}
+VALID_CROSS_REVIEWERS = {"none", "hermes", "codex", "both", "claude-code", "all", "configured", "user-waived"}
 VALID_PROMOTION_MODES = {"none", "human_patch", "user_delegated_agent_patch", "rollback"}
 CLOSURE_METADATA_FIELDS = ("closed_at", "closure_reason", "closure_evidence", "closure_reviewed_by", "closure_policy")
 
@@ -591,7 +591,7 @@ def main() -> int:
     close_parser.add_argument("manifest")
     close_parser.add_argument("--superseded-by", required=True)
     close_parser.add_argument("--reason", default="Closed without promotion because a later candidate superseded this one.")
-    close_parser.add_argument("--cross-reviewed-by", choices=("none", "hermes", "codex", "both", "user-waived"))
+    close_parser.add_argument("--cross-reviewed-by", choices=("none", "hermes", "codex", "both", "claude-code", "all", "configured", "user-waived"))
     close_parser.add_argument("--dry-run", action="store_true")
     close_parser.set_defaults(func=close_superseded)
 
@@ -599,7 +599,7 @@ def main() -> int:
     close_obs_parser.add_argument("manifest")
     close_obs_parser.add_argument("--reason", required=True)
     close_obs_parser.add_argument("--evidence", action="append", default=[])
-    close_obs_parser.add_argument("--reviewed-by", default="none", choices=("none", "hermes", "codex", "both", "user-waived"))
+    close_obs_parser.add_argument("--reviewed-by", default="none", choices=("none", "hermes", "codex", "both", "claude-code", "all", "configured", "user-waived"))
     close_obs_parser.add_argument("--dry-run", action="store_true")
     close_obs_parser.set_defaults(func=close_observation)
 

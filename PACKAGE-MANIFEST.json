@@ -2,9 +2,9 @@
   "package": "skill-sublation-release",
   "version": "2.0.0",
   "release_date": "2026-06-13",
-  "built_at": "2026-06-13T07:32:21.860514+00:00",
-  "source": "local formal skill-sublation root after approved v2.0 promotion",
-  "external_publication_performed": false,
+  "built_at": "2026-06-13T08:32:44.880295+00:00",
+  "source": "GitHub repository root corrected from local v2.0 desktop release package; MIT LICENSE preserved at root",
+  "external_publication_performed": true,
   "promoted_candidates": [
     "20260612-configurable-review-seats-codex",
     "20260612-release-hygiene-codex"
@@ -21,12 +21,14 @@
     "review_policy_tests": "11 passed, 0 failed",
     "bytecode_artifacts": 0,
     "r1_deleted_content_matches": 0,
-    "personal_workstation_path_matches": 0
+    "personal_workstation_path_matches": 0,
+    "license_present": true
   },
   "files": {
     ".gitignore": "sha256:3b77f5b0a49d30db73a37e3490df2961bb53041b94b19105e2c97b51f1a9fa66",
     "CHANGELOG.md": "sha256:81bac63c54df8d025d684a2696e977572064339c00804354801a56cd9a39b5f3",
     "JOINT-AUDIT.md": "sha256:ba44fe15e5d966881218cd5898fcaa9cc8358b863ef39f2b4f1e2b1b8dfb6eb4",
+    "LICENSE": "sha256:58a330a4ed901916aef603a6ffd2488c139757c22e4fdd5ef8142a00799c4b19",
     "README.md": "sha256:e86113066cf585aa31aa27ae5909b0cb1396072d24e83281fe60ed8be1db047c",
     "RELEASE-v2.0.md": "sha256:ab5b4ac7c8ffed2ad179f18e874e57b4c30ea78366811fa1c877120553af4123",
     "SKILL.md": "sha256:be151c0e1ae23d20491be640d5891f3e8f39801881c264358df4d76eba85542d",

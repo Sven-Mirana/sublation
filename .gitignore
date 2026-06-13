@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.pyo
+*.orig
+*.rej
+.DS_Store
+.pytest_cache/
+candidates/
+rollback-points/
+validation/tmp/

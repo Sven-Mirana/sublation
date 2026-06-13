@@ -45,7 +45,10 @@
       }
     },
     "summary": { "type": "string" },
-    "recommendation": { "enum": ["obs_only", "flag_for_review", "create_candidate"] }
+    "recommendation": { "enum": ["obs_only", "flag_for_review", "create_candidate"] },
+    "decision_history_event": {
+      "type": "object",
+      "description": "Optional mapping into validation.decision_history[] when an observation leads to revision, promotion learning, or closure evidence."
+    }
   }
 }
-

@@ -7,7 +7,11 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
+import subprocess
+import tempfile
 from pathlib import Path
+from datetime import datetime, timezone
 
 
 def check(name: str, passed: bool, detail: str, severity: str = "required") -> dict:
@@ -100,6 +104,39 @@ def patch_diff_format_errors(patch_path: Path) -> list[str]:
     return errors
 
 
+def patch_apply_check_errors(manifest: dict, patch_path: Path) -> list[str]:
+    if not patch_path.exists() or not patch_path.read_text(encoding="utf-8", errors="replace").strip():
+        return []
+    source_path = manifest.get("source_skill", {}).get("path")
+    if not source_path:
+        return ["source_skill.path missing; cannot run git apply --check"]
+    source = Path(str(source_path)).expanduser()
+    if not source.exists() or not source.is_dir():
+        return [f"source_skill.path not found; cannot run git apply --check: {source}"]
+
+    def ignore(_dir: str, names: list[str]) -> set[str]:
+        # Keep bytecode files in the temp source copy so cleanup patches that
+        # delete .pyc/__pycache__ artifacts can be verified by git apply --check.
+        return {
+            name for name in names
+            if name == ".DS_Store"
+            or name.endswith((".orig", ".rej"))
+        }
+
+    with tempfile.TemporaryDirectory(prefix="sublation-apply-check-") as tmp:
+        work = Path(tmp) / "formal-copy"
+        shutil.copytree(source, work, ignore=ignore)
+        proc = subprocess.run(
+            ["git", "-C", str(work), "apply", "--check", str(patch_path.resolve())],
+            text=True,
+            capture_output=True,
+        )
+        if proc.returncode == 0:
+            return []
+        detail = (proc.stderr or proc.stdout or "git apply --check failed").strip().splitlines()
+        return detail[:6]
+
+
 def spec_patch_runtime_changes(manifest: dict, root: Path) -> list[str]:
     if manifest.get("candidate_type") != "spec-patch":
         return []
@@ -180,7 +217,7 @@ def manifest_consistency_errors(manifest: dict) -> list[str]:
 
     valid_auditor_statuses = {"passed", "conditional", "failed", "pending"}
     valid_statuses = {"draft", "validated", "review_pending", "approved", "promoted", "observation_window", "closed", "rejected"}
-    valid_cross_reviewers = {"none", "hermes", "codex", "both", "user-waived"}
+    valid_cross_reviewers = {"none", "hermes", "codex", "both", "claude-code", "all", "configured", "user-waived"}
     if auditor_status not in valid_auditor_statuses:
         errors.append(f"validation.auditor_status invalid: {auditor_status!r}")
     if status not in valid_statuses:
@@ -210,6 +247,455 @@ def manifest_consistency_errors(manifest: dict) -> list[str]:
     if superseded_by and status != "rejected":
         errors.append("superseded_by requires status='rejected'")
     return errors
+
+
+FOUR_PARTY_REPORT_CUTOFF = datetime(2026, 6, 11, 0, 0, 0, tzinfo=timezone.utc)
+DEFAULT_REQUIRED_PRE_PROMOTION_REPORTERS = {"claude-code", "codex", "hermes"}
+DEFAULT_REQUIRED_REVIEW_ROLES = {"implementation_audit", "independent_review", "business_boundary"}
+VALID_REVIEW_POLICY_MODES = {"default_three_agent", "configured_multi_agent", "single_agent", "user_waived"}
+VALID_REVIEW_INDEPENDENCE = {"independent", "same_agent", "user", "external", "not_available"}
+VALID_PRE_PROMOTION_REPORT_STATUSES = {"approve", "hold", "reject", "info"}
+
+
+def manifest_created_at_or_after(manifest: dict, cutoff: datetime) -> tuple[bool, str | None]:
+    raw = str(manifest.get("created_at") or "")
+    if not raw:
+        return False, "manifest.created_at missing; four-party pre-promotion gate skipped"
+    try:
+        created = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False, f"manifest.created_at invalid: {raw!r}; four-party pre-promotion gate skipped"
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return created >= cutoff, None
+
+
+def nonempty_str(value: object) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def configured_required_roles(policy: dict) -> set[str]:
+    raw_roles = policy.get("required_roles")
+    if isinstance(raw_roles, list) and raw_roles:
+        return {str(role).strip() for role in raw_roles if nonempty_str(role)}
+
+    assignments = policy.get("role_assignments")
+    if isinstance(assignments, list):
+        roles = {
+            str(item.get("role")).strip()
+            for item in assignments
+            if isinstance(item, dict) and item.get("required") is not False and nonempty_str(item.get("role"))
+        }
+        if roles:
+            return roles
+
+    mode = policy.get("mode")
+    if mode == "single_agent":
+        return {"combined_review"}
+    if mode == "user_waived":
+        return set()
+    return set(DEFAULT_REQUIRED_REVIEW_ROLES)
+
+
+def review_policy_findings(manifest: dict, validation: dict) -> tuple[dict | None, list[str], list[str]]:
+    policy = validation.get("review_policy")
+    if policy is None:
+        return None, [], []
+    if not isinstance(policy, dict):
+        return None, ["validation.review_policy must be an object"], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    mode = policy.get("mode")
+    if mode not in VALID_REVIEW_POLICY_MODES:
+        errors.append(f"validation.review_policy.mode invalid: {mode!r}")
+    if mode in {"configured_multi_agent", "single_agent", "user_waived"}:
+        if policy.get("policy_authorized_by") != "user":
+            errors.append("non-default review_policy.mode requires policy_authorized_by='user'")
+        if not (nonempty_str(policy.get("authorization_message_id")) or nonempty_str(policy.get("authorization_report_path"))):
+            errors.append("non-default review_policy.mode requires authorization_message_id or authorization_report_path")
+
+    required_roles = policy.get("required_roles")
+    if required_roles is not None:
+        if not isinstance(required_roles, list) or not required_roles or not all(nonempty_str(role) for role in required_roles):
+            errors.append("validation.review_policy.required_roles must be a nonempty string array")
+        elif len(set(required_roles)) != len(required_roles):
+            errors.append("validation.review_policy.required_roles must not contain duplicates")
+
+    min_required_reviews = policy.get("min_required_reviews")
+    if min_required_reviews is not None and (not isinstance(min_required_reviews, int) or min_required_reviews < 1):
+        errors.append("validation.review_policy.min_required_reviews must be a positive integer")
+
+    assignments = policy.get("role_assignments")
+    agent_roles: dict[str, set[str]] = {}
+    if assignments is not None:
+        if not isinstance(assignments, list):
+            errors.append("validation.review_policy.role_assignments must be an array")
+        else:
+            for index, item in enumerate(assignments):
+                if not isinstance(item, dict):
+                    errors.append(f"validation.review_policy.role_assignments[{index}] must be an object")
+                    continue
+                role = item.get("role")
+                agent = item.get("agent")
+                if not nonempty_str(role):
+                    errors.append(f"validation.review_policy.role_assignments[{index}].role is required")
+                if not nonempty_str(agent):
+                    errors.append(f"validation.review_policy.role_assignments[{index}].agent is required")
+                if "required" in item and not isinstance(item.get("required"), bool):
+                    errors.append(f"validation.review_policy.role_assignments[{index}].required must be boolean")
+                independence = item.get("independence")
+                if independence is not None and independence not in VALID_REVIEW_INDEPENDENCE:
+                    errors.append(f"validation.review_policy.role_assignments[{index}].independence invalid: {independence!r}")
+                if nonempty_str(role) and nonempty_str(agent) and item.get("required") is not False:
+                    agent_roles.setdefault(str(agent).strip(), set()).add(str(role).strip())
+
+    allow_same_agent = bool(policy.get("allow_same_agent_multiple_roles"))
+    creator = str(manifest.get("created_by") or "").strip()
+    for agent, roles in sorted(agent_roles.items()):
+        if mode == "configured_multi_agent" and "implementation_audit" in roles and "independent_review" in roles:
+            errors.append(
+                f"configured_multi_agent cannot assign implementation_audit and independent_review to the same agent: {agent!r}"
+            )
+        if mode == "configured_multi_agent" and creator and agent == creator and "independent_review" in roles:
+            errors.append(
+                f"configured_multi_agent cannot assign independent_review to candidate creator {creator!r}"
+            )
+        if len(roles) > 1 and not allow_same_agent:
+            errors.append(
+                f"validation.review_policy assigns multiple required roles to {agent!r} without allow_same_agent_multiple_roles=true"
+            )
+        elif len(roles) > 1:
+            warnings.append(
+                f"validation.review_policy assigns multiple required roles to {agent!r}; evidence density is lower than independent cross-agent review"
+            )
+
+    if mode == "single_agent" and policy.get("allow_same_agent_multiple_roles") is not True:
+        warnings.append("single_agent review_policy should set allow_same_agent_multiple_roles=true and disclose lower evidence density")
+
+    return policy, errors, warnings
+
+
+def pre_promotion_report_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    validation = manifest.get("validation", {})
+    status = validation.get("status")
+    cross_reviewed_by = validation.get("cross_reviewed_by")
+    promoted_or_approved = status in {"approved", "promoted", "observation_window", "closed"}
+    created_after_cutoff, created_warning = manifest_created_at_or_after(manifest, FOUR_PARTY_REPORT_CUTOFF)
+    if promoted_or_approved and created_warning:
+        return [], [created_warning]
+    if not promoted_or_approved or not created_after_cutoff:
+        return [], []
+
+    policy, policy_errors, policy_warnings = review_policy_findings(manifest, validation)
+    mode = policy.get("mode") if policy else None
+    if mode == "user_waived" or cross_reviewed_by == "user-waived":
+        return policy_errors, policy_warnings
+
+    reports = validation.get("pre_promotion_reports")
+    if reports is None:
+        return policy_errors + ["validation.pre_promotion_reports missing for post-2026-06-11 promoted/approved candidate"], policy_warnings
+    if not isinstance(reports, list):
+        return policy_errors + ["validation.pre_promotion_reports must be an array"], policy_warnings
+
+    errors: list[str] = list(policy_errors)
+    warnings: list[str] = list(policy_warnings)
+    reviewers: set[str] = set()
+    latest_required_statuses: dict[str, tuple[int, str]] = {}
+    latest_required_reviewers: dict[str, str] = {}
+
+    using_configured_policy = policy is not None and mode != "default_three_agent"
+    required_keys = configured_required_roles(policy) if using_configured_policy else set(DEFAULT_REQUIRED_PRE_PROMOTION_REPORTERS)
+    key_label = "role" if using_configured_policy else "reviewer"
+    approved_required_reviewers: set[str] = set()
+
+    for index, report in enumerate(reports):
+        if not isinstance(report, dict):
+            errors.append(f"pre_promotion_reports[{index}] must be an object")
+            continue
+        reviewer = report.get("reviewer")
+        role = report.get("role")
+        report_status = report.get("status")
+        focus = str(report.get("focus") or "").strip()
+        if not nonempty_str(reviewer):
+            errors.append(f"pre_promotion_reports[{index}].reviewer is required")
+            continue
+        reviewer = str(reviewer).strip()
+        reviewers.add(reviewer)
+        role_key = str(role).strip() if nonempty_str(role) else ""
+        if using_configured_policy and not role_key:
+            errors.append(f"pre_promotion_reports[{index}].role is required when validation.review_policy is configured")
+        if role_key and "independence" in report and report.get("independence") not in VALID_REVIEW_INDEPENDENCE:
+            errors.append(f"pre_promotion_reports[{index}].independence invalid: {report.get('independence')!r}")
+        if report_status not in VALID_PRE_PROMOTION_REPORT_STATUSES:
+            errors.append(f"pre_promotion_reports[{index}].status invalid: {report_status!r}")
+        else:
+            key = role_key if using_configured_policy else reviewer
+            if key in required_keys:
+                latest_required_statuses[key] = (index, report_status)
+                latest_required_reviewers[key] = reviewer
+                if report_status == "approve":
+                    approved_required_reviewers.add(reviewer)
+        if not focus:
+            errors.append(f"pre_promotion_reports[{index}].focus is required")
+        if (role_key if using_configured_policy else reviewer) in required_keys and not (report.get("message_id") or report.get("report_path")):
+            warnings.append(
+                f"pre_promotion_reports[{index}] {key_label}={(role_key if using_configured_policy else reviewer)!r} should record message_id or report_path"
+            )
+
+    present_required = set(latest_required_statuses)
+    missing = sorted(required_keys - present_required)
+    if missing:
+        errors.append(f"validation.pre_promotion_reports missing required {key_label}s: {', '.join(missing)}")
+    latest_non_approvals = [
+        f"{key} at pre_promotion_reports[{index}] status={report_status!r}"
+        for key, (index, report_status) in sorted(latest_required_statuses.items())
+        if report_status != "approve"
+    ]
+    if latest_non_approvals:
+        errors.append(
+            "validation.pre_promotion_reports latest required reports must approve before promotion: "
+            + "; ".join(latest_non_approvals)
+        )
+    min_required_reviews = policy.get("min_required_reviews") if policy else None
+    if min_required_reviews is None:
+        min_required_reviews = 1 if mode == "single_agent" else len(required_keys)
+    if not isinstance(min_required_reviews, int) or min_required_reviews < 1:
+        min_required_reviews = len(required_keys) or 1
+    if len(approved_required_reviewers) < min_required_reviews:
+        errors.append(
+            f"validation.pre_promotion_reports has {len(approved_required_reviewers)} approving required reviewer(s), below min_required_reviews={min_required_reviews}"
+        )
+    if cross_reviewed_by == "configured" and policy is None:
+        errors.append("validation.cross_reviewed_by='configured' requires validation.review_policy")
+    if cross_reviewed_by == "all":
+        if using_configured_policy:
+            if missing:
+                errors.append("validation.cross_reviewed_by='all' requires all configured required roles to report")
+        elif reviewers & DEFAULT_REQUIRED_PRE_PROMOTION_REPORTERS != DEFAULT_REQUIRED_PRE_PROMOTION_REPORTERS:
+            errors.append(
+                "validation.cross_reviewed_by='all' requires default claude-code, codex, hermes agent pre_promotion_reports when no review_policy is configured"
+            )
+
+    return errors, warnings
+
+
+DECISION_HISTORY_TRANSITION_UNTIL = datetime(2026, 9, 11, 0, 0, 0, tzinfo=timezone.utc)
+VALID_DECISION_HISTORY_PHASES = {
+    "candidate_revision",
+    "pre_promotion_review",
+    "promotion",
+    "observation_window",
+    "closure",
+}
+VALID_DECISION_TRIGGER_KINDS = {
+    "report",
+    "audit",
+    "smoke_test",
+    "user_decision",
+    "observation",
+    "external_paper",
+    "manual_review",
+}
+VALID_DECISION_ACTION_KINDS = {"revision", "audit", "smoke_test", "report", "observation", "no_change"}
+VALID_DECISION_OUTCOMES = {"resolved", "held", "rejected", "approved", "deferred", "observed"}
+VALID_REPRODUCTION_STATUS = {"passed", "pending", "failed", "not_required"}
+VALID_REPRODUCTION_METHODS = {"audit", "fixture", "smoke_test", "manual_review", "mixed"}
+VALID_REJECTED_ALTERNATIVE_SCOPES = {"design_fork", "spec_patch", "absorption", "review_conflict", "routing"}
+VALID_SENSITIVE_CONTEXT_CLASSES = {
+    "credential_path",
+    "cookie_path",
+    "login_session",
+    "page_body",
+    "user_data",
+    "contract_data",
+    "private_chat",
+    "other",
+}
+
+
+def string_array(value: object, *, min_items: int = 0) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= min_items
+        and all(isinstance(item, str) and item.strip() for item in value)
+    )
+
+
+def post_rule_promoted_or_approved(manifest: dict) -> bool:
+    validation = manifest.get("validation", {})
+    status = validation.get("status")
+    promoted_or_approved = status in {"approved", "promoted", "observation_window", "closed"}
+    created_after_cutoff, _ = manifest_created_at_or_after(manifest, FOUR_PARTY_REPORT_CUTOFF)
+    return promoted_or_approved and created_after_cutoff
+
+
+def decision_history_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    validation = manifest.get("validation", {})
+    history = validation.get("decision_history")
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if history is None:
+        if post_rule_promoted_or_approved(manifest):
+            target = warnings if datetime.now(timezone.utc) < DECISION_HISTORY_TRANSITION_UNTIL else errors
+            target.append("validation.decision_history missing for post-rule promoted/approved candidate")
+        return errors, warnings
+    if not isinstance(history, list):
+        return ["validation.decision_history must be an array"], []
+
+    seen_ids: set[str] = set()
+    for index, event in enumerate(history):
+        prefix = f"decision_history[{index}]"
+        if not isinstance(event, dict):
+            errors.append(f"{prefix} must be an object")
+            continue
+
+        event_id = event.get("event_id")
+        if not isinstance(event_id, str) or not event_id.strip():
+            errors.append(f"{prefix}.event_id is required")
+        elif event_id in seen_ids:
+            errors.append(f"{prefix}.event_id duplicates {event_id!r}")
+        else:
+            seen_ids.add(event_id)
+
+        if event.get("phase") not in VALID_DECISION_HISTORY_PHASES:
+            errors.append(f"{prefix}.phase invalid: {event.get('phase')!r}")
+
+        trigger = event.get("trigger")
+        if not isinstance(trigger, dict):
+            errors.append(f"{prefix}.trigger must be an object")
+        else:
+            if trigger.get("kind") not in VALID_DECISION_TRIGGER_KINDS:
+                errors.append(f"{prefix}.trigger.kind invalid: {trigger.get('kind')!r}")
+            if not isinstance(trigger.get("id"), str) or not trigger.get("id", "").strip():
+                errors.append(f"{prefix}.trigger.id is required")
+            if not nonempty_str(trigger.get("by")):
+                errors.append(f"{prefix}.trigger.by is required")
+
+        if not isinstance(event.get("diagnosis"), str) or not event.get("diagnosis", "").strip():
+            errors.append(f"{prefix}.diagnosis is required")
+
+        action = event.get("action")
+        if not isinstance(action, dict):
+            errors.append(f"{prefix}.action must be an object")
+        else:
+            if action.get("kind") not in VALID_DECISION_ACTION_KINDS:
+                errors.append(f"{prefix}.action.kind invalid: {action.get('kind')!r}")
+            if not isinstance(action.get("summary"), str) or not action.get("summary", "").strip():
+                errors.append(f"{prefix}.action.summary is required")
+            if "changed_paths" in action and not string_array(action.get("changed_paths")):
+                errors.append(f"{prefix}.action.changed_paths must be a string array")
+
+        if not string_array(event.get("evidence"), min_items=1):
+            errors.append(f"{prefix}.evidence must be a non-empty string array")
+
+        outcome = event.get("outcome")
+        if not isinstance(outcome, dict):
+            errors.append(f"{prefix}.outcome must be an object")
+        else:
+            if outcome.get("status") not in VALID_DECISION_OUTCOMES:
+                errors.append(f"{prefix}.outcome.status invalid: {outcome.get('status')!r}")
+            if not isinstance(outcome.get("summary"), str) or not outcome.get("summary", "").strip():
+                errors.append(f"{prefix}.outcome.summary is required")
+
+    return errors, warnings
+
+
+def independent_reproduction_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    validation = manifest.get("validation", {})
+    reproduction = validation.get("independent_reproduction")
+    errors: list[str] = []
+    warnings: list[str] = []
+
+    if reproduction is None:
+        if post_rule_promoted_or_approved(manifest):
+            errors.append("validation.independent_reproduction missing for post-rule promoted/approved candidate")
+        return errors, warnings
+    if not isinstance(reproduction, dict):
+        return ["validation.independent_reproduction must be an object"], []
+
+    status = reproduction.get("status")
+    if status not in VALID_REPRODUCTION_STATUS:
+        errors.append(f"independent_reproduction.status invalid: {status!r}")
+        return errors, warnings
+
+    promoted_or_approved = post_rule_promoted_or_approved(manifest)
+    if promoted_or_approved and status in {"pending", "failed"}:
+        errors.append(f"independent_reproduction.status={status!r} blocks promotion")
+    if status == "not_required":
+        if not isinstance(reproduction.get("not_required_reason"), str) or not reproduction.get("not_required_reason", "").strip():
+            errors.append("independent_reproduction.status='not_required' requires not_required_reason")
+        if promoted_or_approved:
+            warnings.append("independent_reproduction.not_required before promotion should be rare and explicitly reviewed")
+
+    performed_by = reproduction.get("performed_by", [])
+    if performed_by is not None:
+        if not isinstance(performed_by, list) or any(not nonempty_str(actor) for actor in performed_by):
+            errors.append("independent_reproduction.performed_by must be a string array of agent ids")
+        elif status == "passed":
+            author = str(manifest.get("created_by") or "")
+            non_author = [actor for actor in performed_by if actor != author]
+            if not non_author:
+                errors.append("independent_reproduction.status='passed' requires at least one non-author performer")
+
+    method = reproduction.get("method")
+    if method is not None and method not in VALID_REPRODUCTION_METHODS:
+        errors.append(f"independent_reproduction.method invalid: {method!r}")
+    if status in {"passed", "failed"} and not string_array(reproduction.get("evidence"), min_items=1):
+        errors.append(f"independent_reproduction.status={status!r} requires non-empty evidence")
+    if "limitations" in reproduction and not string_array(reproduction.get("limitations")):
+        errors.append("independent_reproduction.limitations must be a string array")
+
+    return errors, warnings
+
+
+def rejected_alternatives_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    alternatives = manifest.get("validation", {}).get("rejected_alternatives")
+    if alternatives is None:
+        return [], []
+    if not isinstance(alternatives, list):
+        return ["validation.rejected_alternatives must be an array"], []
+
+    errors: list[str] = []
+    for index, item in enumerate(alternatives):
+        prefix = f"rejected_alternatives[{index}]"
+        if not isinstance(item, dict):
+            errors.append(f"{prefix} must be an object")
+            continue
+        for field in ("alternative", "reason_rejected", "retained_learning"):
+            if not isinstance(item.get(field), str) or not item.get(field, "").strip():
+                errors.append(f"{prefix}.{field} is required")
+        if item.get("scope") not in VALID_REJECTED_ALTERNATIVE_SCOPES:
+            errors.append(f"{prefix}.scope invalid: {item.get('scope')!r}")
+        if "evidence" in item and not string_array(item.get("evidence")):
+            errors.append(f"{prefix}.evidence must be a string array")
+    return errors, []
+
+
+def redacted_reporting_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    reporting = manifest.get("redacted_reporting")
+    if reporting is None:
+        return [], []
+    if not isinstance(reporting, dict):
+        return ["redacted_reporting must be an object"], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    for field in ("shareable_evidence", "local_only_evidence"):
+        if not string_array(reporting.get(field)):
+            errors.append(f"redacted_reporting.{field} must be a string array")
+
+    classes = reporting.get("sensitive_context_classes")
+    if not isinstance(classes, list) or any(item not in VALID_SENSITIVE_CONTEXT_CLASSES for item in classes):
+        errors.append("redacted_reporting.sensitive_context_classes contains invalid values")
+
+    shareable = set(reporting.get("shareable_evidence") or [])
+    local_only = set(reporting.get("local_only_evidence") or [])
+    overlap = sorted(shareable & local_only)
+    if overlap:
+        warnings.append("redacted_reporting evidence appears in both shareable and local_only: " + ", ".join(overlap))
+    return errors, warnings
 
 
 def relationship_consistency_errors(manifest: dict) -> list[str]:
@@ -436,6 +922,166 @@ def post_promotion_safety_findings(manifest: dict) -> tuple[list[str], list[str]
             f"relationships.target_skill.path differs from formal_post_promotion.path: {target_path!r} != {formal_path!r}"
         )
 
+    try:
+        from strong_path_check import strong_path_findings
+
+        sp_errors, sp_warnings = strong_path_findings(manifest)
+        errors.extend(sp_errors)
+        warnings.extend(sp_warnings)
+    except ImportError:
+        warnings.append("strong_path_check module not installed; cross-root promotion check skipped")
+
+    return errors, warnings
+
+
+VALUE_DELTA_GATE_CUTOFF = datetime(2026, 6, 1, 14, 0, 0, tzinfo=timezone.utc)
+
+
+def manifest_created_after_value_gate(manifest: dict) -> bool:
+    raw = str(manifest.get("created_at") or "")
+    if not raw:
+        return False
+    try:
+        created = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    return created >= VALUE_DELTA_GATE_CUTOFF
+
+
+def nonempty_string_list(value: object) -> bool:
+    return isinstance(value, list) and bool(value) and all(isinstance(item, str) and item.strip() for item in value)
+
+
+def value_delta_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    validation = manifest.get("validation", {})
+    status = validation.get("status")
+    promoted_or_approved = status in {"approved", "promoted", "observation_window", "closed"}
+    value_delta = validation.get("value_delta")
+    enforce = manifest_created_after_value_gate(manifest) and promoted_or_approved
+
+    if value_delta is None:
+        if enforce:
+            return ["validation.value_delta missing for post-gate promoted/approved candidate"], []
+        return [], []
+    if not isinstance(value_delta, dict):
+        return ["validation.value_delta must be an object"], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    delta_status = value_delta.get("status")
+    if delta_status not in {"positive_delta", "not_applicable", "unproven", "regressed"}:
+        errors.append(f"value_delta.status invalid: {delta_status!r}")
+        return errors, warnings
+
+    if promoted_or_approved and delta_status in {"unproven", "regressed"}:
+        errors.append(f"value_delta.status={delta_status!r} blocks promotion")
+
+    if delta_status == "positive_delta":
+        if not nonempty_string_list(value_delta.get("positive_delta_categories")):
+            errors.append("value_delta.positive_delta requires non-empty positive_delta_categories")
+        for field in ("summary", "fallback_or_rollback", "observation_acceptance"):
+            if not isinstance(value_delta.get(field), str) or not value_delta.get(field).strip():
+                errors.append(f"value_delta.positive_delta requires {field}")
+        if not nonempty_string_list(value_delta.get("evidence")):
+            errors.append("value_delta.positive_delta requires non-empty evidence")
+        if not isinstance(value_delta.get("regression_risks"), list):
+            errors.append("value_delta.regression_risks must be an array")
+    elif delta_status == "not_applicable":
+        if not value_delta.get("not_applicable_reason"):
+            errors.append("value_delta.status='not_applicable' requires not_applicable_reason")
+        if promoted_or_approved:
+            warnings.append("value_delta.not_applicable after approval/promotion should be rare and explicitly reviewed")
+
+    old_retained = value_delta.get("old_capability_retained")
+    capability_reduction = value_delta.get("capability_reduction")
+    user_note = str(value_delta.get("user_approval_note") or "").strip()
+    backward_compat = manifest.get("backward_compat")
+
+    if promoted_or_approved and old_retained is False and not user_note:
+        errors.append("value_delta.old_capability_retained=false requires explicit user_approval_note before promotion")
+    if promoted_or_approved and (backward_compat is False or capability_reduction is True) and not user_note:
+        errors.append("backward_compat=false or capability_reduction=true requires value_delta.user_approval_note")
+    if capability_reduction is not None and not isinstance(capability_reduction, bool):
+        errors.append("value_delta.capability_reduction must be boolean when present")
+    if old_retained is not None and not isinstance(old_retained, bool):
+        errors.append("value_delta.old_capability_retained must be boolean when present")
+
+    return errors, warnings
+
+
+def empirical_scorecard_findings(manifest: dict) -> tuple[list[str], list[str]]:
+    validation = manifest.get("validation", {})
+    scorecard = validation.get("empirical_scorecard")
+    if scorecard is None:
+        return [], []
+    if not isinstance(scorecard, dict):
+        return ["validation.empirical_scorecard must be an object"], []
+
+    errors: list[str] = []
+    warnings: list[str] = []
+    status = scorecard.get("status")
+    valid_statuses = {"measured", "not_applicable", "not_measured"}
+    valid_decisions = {
+        "improved",
+        "neutral",
+        "regressed",
+        "blocked",
+        "accepted_by_review",
+        "not_applicable",
+        "deferred",
+    }
+    if status not in valid_statuses:
+        errors.append(f"empirical_scorecard.status invalid: {status!r}")
+        return errors, warnings
+
+    if status == "measured":
+        required = (
+            "metric_name",
+            "baseline_score",
+            "candidate_score",
+            "higher_is_better",
+            "fixture_or_dataset",
+            "evaluator",
+            "regression_checks",
+            "decision",
+        )
+        for field in required:
+            if field not in scorecard:
+                errors.append(f"empirical_scorecard.status='measured' requires {field}")
+        for field in ("baseline_score", "candidate_score"):
+            if field in scorecard and not isinstance(scorecard.get(field), (int, float)):
+                errors.append(f"empirical_scorecard.{field} must be numeric")
+        if "higher_is_better" in scorecard and not isinstance(scorecard.get("higher_is_better"), bool):
+            errors.append("empirical_scorecard.higher_is_better must be boolean")
+        checks = scorecard.get("regression_checks")
+        if "regression_checks" in scorecard and (
+            not isinstance(checks, list) or not checks or not all(isinstance(item, str) and item for item in checks)
+        ):
+            errors.append("empirical_scorecard.regression_checks must be a non-empty string array")
+        decision = scorecard.get("decision")
+        if decision not in valid_decisions:
+            errors.append(f"empirical_scorecard.decision invalid: {decision!r}")
+        elif decision in {"regressed", "blocked"}:
+            errors.append(f"empirical_scorecard.decision={decision!r} blocks promotion")
+
+    if status == "not_applicable":
+        if not scorecard.get("not_applicable_reason"):
+            errors.append("empirical_scorecard.status='not_applicable' requires not_applicable_reason")
+        decision = scorecard.get("decision")
+        if decision not in {None, "not_applicable", "accepted_by_review"}:
+            warnings.append("not_applicable scorecards should not carry an improvement decision")
+
+    if status == "not_measured":
+        if not scorecard.get("not_measured_reason"):
+            errors.append("empirical_scorecard.status='not_measured' requires not_measured_reason")
+        validation_status = validation.get("status")
+        if validation_status in {"approved", "promoted", "observation_window", "closed"}:
+            warnings.append(
+                "empirical_scorecard.status='not_measured' after approval/promotion needs explicit human review"
+            )
+
     return errors, warnings
 
 
@@ -447,6 +1093,7 @@ def strict_checks(root: Path, manifest: dict | None) -> list[dict]:
 
     residual_labels = residual_candidate_label_lines(root)
     patch_format_errors = patch_diff_format_errors(root / "PATCH.diff")
+    patch_apply_errors = patch_apply_check_errors(manifest, root / "PATCH.diff")
     runtime_changes = spec_patch_runtime_changes(manifest, root)
     promoted_manifest = is_promoted_manifest(manifest)
     stale_paths = [] if promoted_manifest else stale_baseline_paths(manifest)
@@ -456,6 +1103,13 @@ def strict_checks(root: Path, manifest: dict | None) -> list[dict]:
     external_eval_errors = external_evaluation_errors(manifest, root)
     rights_errors, rights_warnings = rights_provenance_findings(manifest)
     safety_errors, safety_warnings = post_promotion_safety_findings(manifest)
+    scorecard_errors, scorecard_warnings = empirical_scorecard_findings(manifest)
+    value_delta_errors, value_delta_warnings = value_delta_findings(manifest)
+    pre_report_errors, pre_report_warnings = pre_promotion_report_findings(manifest)
+    decision_history_errors, decision_history_warnings = decision_history_findings(manifest)
+    reproduction_errors, reproduction_warnings = independent_reproduction_findings(manifest)
+    rejected_alternative_errors, rejected_alternative_warnings = rejected_alternatives_findings(manifest)
+    redaction_errors, redaction_warnings = redacted_reporting_findings(manifest)
 
     return [
         check(
@@ -467,6 +1121,11 @@ def strict_checks(root: Path, manifest: dict | None) -> list[dict]:
             "strict_patch_diff_format",
             not patch_format_errors,
             format_paths(patch_format_errors),
+        ),
+        check(
+            "strict_patch_apply_check",
+            not patch_apply_errors,
+            format_paths(patch_apply_errors),
         ),
         check(
             "strict_spec_patch_scope",
@@ -514,6 +1173,83 @@ def strict_checks(root: Path, manifest: dict | None) -> list[dict]:
             "strict_post_promotion_safety_legacy",
             not safety_warnings,
             "; ".join(safety_warnings) if safety_warnings else "no post-promotion safety warnings",
+            "warning",
+        ),
+        check(
+            "strict_empirical_scorecard",
+            not scorecard_errors,
+            "; ".join(scorecard_errors) if scorecard_errors else "empirical scorecard metadata is self-consistent or absent",
+        ),
+        check(
+            "strict_empirical_scorecard_review",
+            not scorecard_warnings,
+            "; ".join(scorecard_warnings) if scorecard_warnings else "no empirical scorecard review warnings",
+            "warning",
+        ),
+        check(
+            "strict_value_delta_gate",
+            not value_delta_errors,
+            "; ".join(value_delta_errors) if value_delta_errors else "value-delta metadata is self-consistent or not required for this candidate",
+        ),
+        check(
+            "strict_value_delta_gate_review",
+            not value_delta_warnings,
+            "; ".join(value_delta_warnings) if value_delta_warnings else "no value-delta review warnings",
+            "warning",
+        ),
+        check(
+            "strict_pre_promotion_reports",
+            not pre_report_errors,
+            "; ".join(pre_report_errors) if pre_report_errors else "pre-promotion report metadata is self-consistent or not required",
+        ),
+        check(
+            "strict_pre_promotion_reports_review",
+            not pre_report_warnings,
+            "; ".join(pre_report_warnings) if pre_report_warnings else "no pre-promotion report warnings",
+            "warning",
+        ),
+        check(
+            "strict_decision_history",
+            not decision_history_errors,
+            "; ".join(decision_history_errors) if decision_history_errors else "decision-history metadata is self-consistent or not required",
+        ),
+        check(
+            "strict_decision_history_review",
+            not decision_history_warnings,
+            "; ".join(decision_history_warnings) if decision_history_warnings else "no decision-history review warnings",
+            "warning",
+        ),
+        check(
+            "strict_independent_reproduction",
+            not reproduction_errors,
+            "; ".join(reproduction_errors) if reproduction_errors else "independent reproduction metadata is self-consistent or not required",
+        ),
+        check(
+            "strict_independent_reproduction_review",
+            not reproduction_warnings,
+            "; ".join(reproduction_warnings) if reproduction_warnings else "no independent reproduction review warnings",
+            "warning",
+        ),
+        check(
+            "strict_rejected_alternatives",
+            not rejected_alternative_errors,
+            "; ".join(rejected_alternative_errors) if rejected_alternative_errors else "rejected alternatives metadata is self-consistent or absent",
+        ),
+        check(
+            "strict_rejected_alternatives_review",
+            not rejected_alternative_warnings,
+            "; ".join(rejected_alternative_warnings) if rejected_alternative_warnings else "no rejected alternatives review warnings",
+            "warning",
+        ),
+        check(
+            "strict_redacted_reporting",
+            not redaction_errors,
+            "; ".join(redaction_errors) if redaction_errors else "redacted reporting metadata is self-consistent or absent",
+        ),
+        check(
+            "strict_redacted_reporting_review",
+            not redaction_warnings,
+            "; ".join(redaction_warnings) if redaction_warnings else "no redacted reporting review warnings",
             "warning",
         ),
     ]
