@@ -7,7 +7,7 @@ When the natural sublation target has been absorbed into another skill, route to
 You identify a donor skill (e.g., `baoyu-url-to-markdown`) with capabilities missing from the local equivalent. You check `~/.hermes/skills/` and find `canghe-url-to-markdown` — looks like the target. But the last line reads:
 
 ```markdown
-**absorbed_into**: [universal-converter](../productivity/universal-converter/SKILL.md) (2026-05-28)
+**absorbed_into**: `universal-converter` (2026-05-28)
 ```
 
 ## Detection

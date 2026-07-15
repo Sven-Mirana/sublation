@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/worker-config-v1.json",
+  "title": "Sublation Worker Adapter Configuration v1",
+  "type": "object",
+  "required": ["workers", "delivery"],
+  "properties": {
+    "workers": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["argv", "principal_id", "write_roots"],
+        "properties": {
+          "principal_id": { "type": "string", "minLength": 1 },
+          "argv": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+          "cwd": { "type": "string", "minLength": 1 },
+          "read_roots": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "write_roots": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "network_access": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "delivery": {
+      "type": "object",
+      "required": ["actor", "channel", "authorized_reply_senders", "argv"],
+      "properties": {
+        "actor": { "type": "string", "minLength": 1 },
+        "channel": { "type": "string", "minLength": 1 },
+        "authorized_reply_senders": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "timeout_seconds": { "type": "integer", "minimum": 1, "maximum": 86400 },
+        "cwd": { "type": "string", "minLength": 1 },
+        "read_roots": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "write_roots": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "network_access": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

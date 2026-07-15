@@ -1,5 +1,25 @@
 # Changelog
 
+## v3.0.0 - 2026-07-14
+
+### Added
+
+- Executable Loop Engineering gate and decision-packet generator.
+- Durable one-shot run ledger, bounded worker orchestration, local ephemeral adapter, approval receipt verification, and rollback-aware promotion helpers.
+- Run and worker configuration schemas.
+- Tests for loop automation, durable runs, orchestration, receipts, adapters, and promotion recovery.
+
+### Changed
+
+- The skill entrypoint now documents explicit-trigger one-shot behavior and `USER_DECISION_REQUIRED` as the default automation endpoint.
+- Release guidance binds evidence, review state, reports, approvals, candidate revisions, and baseline hashes before formal writes.
+- Public release text uses generic user/approver roles and excludes internal incident records and private runtime artifacts.
+
+### Retained
+
+- V2 configurable review seats, strict audit, value-delta gate, decision history, observation windows, and evidence-not-authority model.
+- Formal skill roots remain read-only until explicit user approval.
+
 ## v2.0.0 - 2026-06-13
 
 ### Added

@@ -2,8 +2,8 @@
 
 Skill Sublation is a governance framework for AI agent skill evolution: observe, candidate, audit, review, promote, and observe again.
 
-Version: v2.0.0
-Release date: 2026-06-13
+Version: v3.0.0
+Release date: 2026-07-14
 License: MIT
 
 ## What It Does
@@ -16,13 +16,14 @@ Core flow:
 Observation -> Candidate -> Audit -> Review -> Promotion -> Observation Window
 ```
 
-## v2.0 Highlights
+## v3.0 Highlights
 
-- Configurable review seats: default three-agent review remains supported, while manifest-declared policies can define local role assignments, single-agent disclosure, or user-waived review.
-- Stronger promotion evidence: value-delta gates, pre-promotion reports, decision history, independent reproduction, rejected alternatives, redacted reporting, and post-promotion safety metadata.
-- Release hygiene: stale references removed, bytecode artifacts excluded, hard-coded local personal paths scrubbed, broken release links corrected, and R1 unauthorized content removed rather than retroactively justified.
-- Evidence-not-authority evaluator model: external evaluators and peer agents can supply evidence, but they do not gain promotion authority.
-- Public-package boundary: runtime candidates, rollback points, private workspace paths, and local chat logs are intentionally excluded from this release folder.
+- Loop Engineering automation: candidate checks, hard gates, evidence aggregation, review-seat state, and decision-packet generation are executable rather than protocol-only.
+- One-shot orchestration: an explicit `sublation` or “扬弃” trigger can create or resume a durable run and continue through candidate-layer work without repeatedly interrupting the user.
+- Approval integrity: reports, evidence hashes, approval receipts, candidate revisions, baseline state, and approved scope are bound before promotion.
+- Bounded adapters: worker roles receive least-privilege read/write/network policies; persistent PATH, provider, credential, launchd, and cron changes remain outside the default path.
+- Rollback-safe promotion: formal writes require explicit user approval, a baseline-matched rollback copy, post-write verification, and restoration on failure.
+- V2 governance remains intact: configurable review seats, value-delta gates, strict audit, decision history, observation windows, and public-package hygiene are retained.
 
 ## Quick Start
 
@@ -43,16 +44,21 @@ python3 scripts/candidate.py create <skill-name> \
 
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/audit.py ~/.hermes/sublation/candidates/<skill>/<candidate-id> --strict
 python3 scripts/lifecycle.py health --warn-after-days 7
+
+# Explicit-trigger V3 one-shot. Run --help first and provide bounded roots/config.
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/sublation_one_shot.py --help
 ```
 
 ## Package Contents
 
 - `SKILL.md` is the runtime instruction entrypoint.
-- `scripts/` contains candidate, audit, lifecycle, observation, and test helpers.
-- `schemas/` contains manifest and observation schemas.
-- `references/` contains governance patterns and release procedures.
-- `RELEASE-v2.0.md`, `JOINT-AUDIT.md`, `PACKAGE-MANIFEST.json`, and `checksums.sha256` document this local package.
+- `scripts/` contains candidate, audit, lifecycle, V3 run/orchestration, receipt, promotion, adapter, release-audit, and test helpers.
+- `schemas/` contains manifest, observation, run, and worker configuration schemas.
+- `references/` contains governance patterns, Loop Engineering contracts, and release procedures.
+- `RELEASE-v3.0.md`, `JOINT-AUDIT.md`, `PACKAGE-MANIFEST.json`, and `checksums.sha256` document this local package.
 
 ## Release Boundary
 
-This folder is a local release package. It does not include git history, private candidate manifests, rollback snapshots, or any automatic publication step. `publish.sh` is guarded and only publishes if a human runs it with `CONFIRM_PUBLISH=1`.
+This folder is a local release package. It does not include git history, private candidate manifests, rollback snapshots, credentials, internal chat logs, or any automatically executed publication step. `publish.sh` is guarded and only publishes if a human deliberately runs it with `CONFIRM_PUBLISH=1` from a prepared repository.
+
+The candidate strict audit and the public release audit serve different objects. Run `scripts/audit.py --strict` against a candidate directory. Run `scripts/release_audit.py` against this release directory.

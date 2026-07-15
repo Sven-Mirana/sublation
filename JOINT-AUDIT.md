@@ -1,27 +1,35 @@
-# Local Audit Evidence - Skill Sublation v2.0.0
+# Local Audit Evidence - Skill Sublation v3.0.0
 
-Date: 2026-06-13
-Target: local v2.0 release package
-Verdict: package-ready for human-controlled publication
+Date: 2026-07-14
+Target: local v3.0 public release package
+Verdict: package-ready for user-controlled review and publication
 
 ## Evidence Sources
 
-- Codex post-promotion validation: strict audits, fixture tests, hygiene scans, package checksums.
-- Hermes chief-of-staff coordination evidence: user-approved promotion path and unified release-blocker tracking.
-- Claude Code review evidence: treated as pre-promotion evidence in manifests, not as standalone promotion authority.
+- Current V3 runtime scripts and schemas were copied into an isolated release staging directory.
+- Release-facing instructions were normalized to generic roles and public paths.
+- Validation ran against the staged bytes before desktop handoff.
+- Reviewer evidence remains separate from user publication authority.
 
 ## Required Checks
 
 | Check | Result |
 |---|---|
-| Configurable review seats strict audit | Pass |
-| Release hygiene strict audit | Pass |
-| Review policy fixture suite | Pass, 11/0 |
-| R1 deleted content scan | Pass |
-| Personal workstation path scan | Pass |
-| Bytecode/package artifact scan | Pass |
-| Package checksum generation | Pass |
+| V3 unit-test discovery | Pass, 107 passed, 0 failed |
+| Public release audit | Pass, 0 findings |
+| Skill frontmatter and size | Pass |
+| JSON schema parsing | Pass |
+| Markdown relative-link validation | Pass |
+| Personal path and room-ID scan | Pass, 0 findings |
+| Secret-pattern scan | Pass, 0 findings |
+| Symlink and bytecode scan | Pass, 0 findings |
+| Guarded publication dry run | Pass, no publication performed |
+| Package checksum verification | Pass, final ledger verified |
+
+## Audit Semantics
+
+`scripts/audit.py --strict` validates candidate-layer contracts and is not a release-directory validator. This package therefore uses `scripts/release_audit.py` for the public tree while retaining the strict candidate audit for real candidate directories.
 
 ## Boundary Notes
 
-This report is evidence for the local release package. It is not an automatic publication approval, and it does not replace the user's authority over GitHub tags, releases, credentials, or external distribution.
+This report is evidence for a local release package. It is not an automatic publication approval and does not authorize GitHub tags, releases, credentials, external distribution, formal skill writes, or persistent control-plane changes.

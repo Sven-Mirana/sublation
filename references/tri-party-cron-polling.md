@@ -86,7 +86,7 @@ When running in cron context, `terminal(curl http://127.0.0.1:8787/...)` may be 
 Setting `deliver` to anything other than `local` will fan out the agent's terminal output to messaging platforms — which is noise for bridge polling. The agent already responds via curl POST to the bridge; the cron output is just confirmation.
 
 ### State file drift after bridge restart
-If the bridge is restarted and `messages.jsonl` is cleared or replaced, the state file's last ID will point to a non-existent message. On next run, `found_last` will never become true, and the script will re-process all messages. This is acceptable — it's a safe default that ensures no messages are missed. To reset: delete the state file.
+If the bridge is restarted and its event log is cleared or replaced, the state file's last ID will point to a non-existent message. On next run, `found_last` will never become true, and the script will re-process all messages. This is acceptable because it ensures no messages are missed. To reset, delete the state file.
 
 ### Empty output → agent still runs
 When the script outputs "No new messages", the agent still runs a full turn. The prompt should instruct the agent to send a brief ping and exit quickly in this case. Don't leave the agent with nothing to do and a large context window — it may wander.

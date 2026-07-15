@@ -316,7 +316,104 @@
         },
         "fallback_verified": { "type": ["boolean", "null"] },
         "old_capability_retained": { "type": ["boolean", "null"] },
+        "skillspector": { "$ref": "#/$defs/skillspector_post_promotion" },
         "notes": { "type": "string" }
+      }
+    },
+    "skillspector_post_promotion": {
+      "type": "object",
+      "required": ["status", "tool", "mode", "recommendation_gating"],
+      "properties": {
+        "status": {
+          "enum": [
+            "not_run",
+            "baseline_recorded",
+            "triaged",
+            "blocked",
+            "passed",
+            "not_required"
+          ]
+        },
+        "tool": { "const": "skillspector" },
+        "version": { "type": "string", "minLength": 1 },
+        "mode": { "enum": ["static_no_llm", "static_with_llm"] },
+        "command": { "type": "string", "minLength": 1 },
+        "target_path": { "type": "string", "minLength": 1 },
+        "baseline_report_path": { "type": "string", "minLength": 1 },
+        "baseline_fingerprint": { "type": "string", "pattern": "^sha256:" },
+        "baseline_tool_version": { "type": "string", "minLength": 1 },
+        "closing_report_path": { "type": "string", "minLength": 1 },
+        "current_fingerprint": { "type": "string", "pattern": "^sha256:" },
+        "risk_score": { "type": "number" },
+        "severity": { "type": "string" },
+        "recommendation": { "type": "string" },
+        "recommendation_gating": { "const": false },
+        "severity_histogram": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "yara_namespaces": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "full_findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillspector_finding" }
+        },
+        "new_findings_since_baseline": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillspector_finding" }
+        },
+        "new_malware_yara_findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillspector_finding" }
+        },
+        "new_confirmed_high_or_critical_untriaged_findings": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillspector_finding" }
+        },
+        "triage": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/skillspector_triage_item" }
+        },
+        "version_change_policy": {
+          "enum": ["same_version_required", "rebaseline_and_human_review_required"]
+        },
+        "closure_decision": {
+          "enum": ["not_evaluated", "allow_closure", "block_closure", "keep_observing", "rebaseline_required"]
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "skillspector_finding": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "severity": { "type": "string" },
+        "category": { "type": "string" },
+        "pattern": { "type": "string" },
+        "yara_namespace": { "type": "string" },
+        "location": { "type": "string" },
+        "fingerprint": { "type": "string" },
+        "confirmed": { "type": "boolean" },
+        "triage_status": {
+          "enum": ["untriaged", "accepted_risk", "false_positive", "remediation_required", "remediated"]
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "skillspector_triage_item": {
+      "type": "object",
+      "required": ["finding", "decision", "reason"],
+      "properties": {
+        "finding": { "type": "string", "minLength": 1 },
+        "decision": {
+          "enum": ["accepted_risk", "false_positive", "remediation_required", "remediated", "defer"]
+        },
+        "reason": { "type": "string", "minLength": 1 },
+        "control": { "type": "string" },
+        "reviewed_by": { "type": "string" },
+        "reviewed_at": { "type": "string" }
       }
     },
     "value_delta": {

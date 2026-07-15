@@ -1,0 +1,405 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/run-v1.json",
+  "title": "Sublation One-Shot Run v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "intent",
+    "created_at",
+    "updated_at",
+    "revision",
+    "state",
+    "configured_roots",
+    "scope",
+    "inventory",
+    "items",
+    "steps",
+    "review_policy",
+    "worker_identities",
+    "control",
+    "tasks",
+    "task_order",
+    "reports",
+    "boundaries"
+  ],
+  "properties": {
+    "schema_version": { "const": 1 },
+    "run_id": { "type": "string", "pattern": "^[A-Za-z0-9._-]+$" },
+    "intent": { "type": "string", "minLength": 1 },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "revision": { "type": "integer", "minimum": 1 },
+    "state": {
+      "enum": [
+        "DISCOVERING",
+        "WORKING",
+        "REWORKING",
+        "AGGREGATING",
+        "USER_DECISION_REQUIRED",
+        "PARTIAL",
+        "BLOCKED",
+        "CLOSED",
+        "APPROVED_PENDING_EXECUTION",
+        "USER_REJECTED",
+        "OBSERVING"
+      ]
+    },
+    "configured_roots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/configuredRoot" }
+    },
+    "scope": {
+      "type": "object",
+      "required": ["mode", "detail", "revision", "targets", "resolution_note"],
+      "properties": {
+        "mode": { "enum": ["all_roots_incremental", "named_targets"] },
+        "detail": { "enum": ["standard", "deep"] },
+        "revision": { "type": "integer", "minimum": 1 },
+        "targets": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["name", "path"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "path": { "type": "string", "minLength": 1 }
+            },
+            "additionalProperties": false
+          }
+        },
+        "resolution_note": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "inventory": {
+      "type": "object",
+      "required": ["scanned_at", "baseline_run_ids", "mode", "skills", "changed_skills", "unchanged_paths", "counts"],
+      "properties": {
+        "scanned_at": { "type": "string" },
+        "baseline_run_ids": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+        "mode": { "enum": ["incremental", "initial_full_snapshot"] },
+        "skills": { "type": "array", "items": { "$ref": "#/$defs/discoveredSkill" } },
+        "changed_skills": { "type": "array", "items": { "$ref": "#/$defs/discoveredSkill" } },
+        "unchanged_paths": { "type": "array", "items": { "type": "string" } },
+        "counts": {
+          "type": "object",
+          "required": ["discovered", "changed", "unchanged", "removed", "missing_roots"],
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "item_id",
+          "target",
+          "target_path",
+          "root_name",
+          "relative_path",
+          "skill_name",
+          "change_type",
+          "is_symlink",
+          "status",
+          "steps",
+          "evidence",
+          "blockers"
+        ],
+        "properties": {
+          "item_id": { "type": "string", "pattern": "^A[1-9][0-9]*$" },
+          "target": { "type": "string", "minLength": 1 },
+          "target_path": { "type": "string", "minLength": 1 },
+          "root_name": { "type": "string", "minLength": 1 },
+          "relative_path": { "type": "string", "minLength": 1 },
+          "skill_name": { "type": "string", "minLength": 1 },
+          "source_tree_hash": { "type": ["string", "null"] },
+          "change_type": { "enum": ["new", "modified", "removed", "root_missing"] },
+          "is_symlink": { "type": "boolean" },
+          "status": {
+            "enum": [
+              "PENDING",
+              "OBSERVED",
+              "CANDIDATE_READY",
+              "AUDIT_PASSED",
+              "VERIFY_PASSED",
+              "REWORK_REQUIRED",
+              "REVIEW_PASSED",
+              "APPROVAL_READY",
+              "CLOSED_REPORT_ONLY",
+              "CLOSED_NOOP",
+              "BLOCKED"
+            ]
+          },
+          "next_phase": { "type": ["string", "null"] },
+          "candidate_id": { "type": ["string", "null"] },
+          "candidate_path": { "type": ["string", "null"] },
+          "patch_path": { "type": ["string", "null"] },
+          "patch_hash": { "type": ["string", "null"], "pattern": "^sha256:" },
+          "target_baseline_hash": { "type": ["string", "null"], "pattern": "^sha256:" },
+          "summary": { "type": "string" },
+          "disposition": {
+            "type": ["string", "null"],
+            "enum": ["promotion", "report_only", "no_op", "blocked", null]
+          },
+          "approval_required": { "type": ["boolean", "null"] },
+          "steps": { "type": "array", "items": { "type": "string" } },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+          "blockers": { "type": "array", "items": { "type": "string" } }
+          ,"phase_attempts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 1 } }
+        },
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "step_id",
+          "item_id",
+          "actor",
+          "phase",
+          "step_status",
+          "candidate_tree_hash",
+          "payload_hash",
+          "recorded_at"
+        ],
+        "properties": {
+          "step_id": { "type": "string" },
+          "item_id": { "type": "string", "pattern": "^A[1-9][0-9]*$" },
+          "actor": { "type": "string" },
+          "phase": { "type": "string" },
+          "step_status": { "enum": ["pass", "hold", "fail", "blocked"] },
+          "item_status": { "type": ["string", "null"] },
+          "candidate_id": { "type": ["string", "null"] },
+          "candidate_path": { "type": ["string", "null"] },
+          "patch_path": { "type": ["string", "null"] },
+          "patch_hash": { "type": ["string", "null"] },
+          "summary": { "type": ["string", "null"] },
+          "disposition": { "type": ["string", "null"] },
+          "evidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+          "blockers": { "type": "array", "items": { "type": "string" } },
+          "task_id": { "type": ["string", "null"] },
+          "executor_principal": { "type": ["string", "null"] },
+          "adapter_fingerprint": { "type": ["string", "null"] },
+          "candidate_tree_hash": { "type": ["string", "null"], "pattern": "^sha256:" },
+          "payload_hash": { "type": "string", "pattern": "^sha256:" },
+          "recorded_at": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "review_policy": {
+      "type": "object",
+      "required": ["mode", "roles", "independence_required", "single_agent_user_authorized"],
+      "properties": {
+        "mode": { "enum": ["configured_multi_agent", "user_authorized_single_agent"] },
+        "roles": {
+          "type": "object",
+          "required": ["builder", "independent_verifier", "reviewer", "coordinator"],
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        },
+        "independence_required": { "type": "boolean" },
+        "single_agent_user_authorized": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "worker_identities": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["principal_id", "adapter_fingerprint", "write_roots"],
+            "properties": {
+              "principal_id": { "type": "string", "minLength": 1 },
+              "adapter_fingerprint": { "type": "string", "pattern": "^sha256:" },
+              "write_roots": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "control": {
+      "type": "object",
+      "required": ["journal_attestation", "attestation_key_sha256", "worker_key_readable"],
+      "properties": {
+        "journal_attestation": { "const": "hmac-sha256" },
+        "attestation_key_sha256": { "type": "string", "pattern": "^sha256:" },
+        "worker_key_readable": { "const": false }
+      },
+      "additionalProperties": false
+    },
+    "tasks": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/task" }
+    },
+    "task_order": { "type": "array", "items": { "type": "string" }, "uniqueItems": true },
+    "reports": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reportSummary" }
+    },
+    "latest_report": {
+      "oneOf": [
+        { "$ref": "#/$defs/reportSummary" },
+        { "type": "null" }
+      ]
+    },
+    "approval": { "type": ["object", "null"] },
+    "boundaries": {
+      "type": "object",
+      "required": [
+        "candidate_only",
+        "formal_write_requires_user_approval",
+        "promotion_requires_user_approval",
+        "credential_or_login_requires_user_approval",
+        "live_validation_requires_user_approval",
+        "persistent_control_plane_change_requires_user_approval"
+      ],
+      "additionalProperties": { "const": true }
+    }
+  },
+  "$defs": {
+    "configuredRoot": {
+      "type": "object",
+      "required": ["name", "path"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^sha256:" }
+      },
+      "additionalProperties": false
+    },
+    "discoveredSkill": {
+      "type": "object",
+      "required": ["root_name", "root_path", "relative_path", "target", "target_path", "skill_name", "tree_hash", "change_type", "is_symlink"],
+      "properties": {
+        "root_name": { "type": "string", "minLength": 1 },
+        "root_path": { "type": "string", "minLength": 1 },
+        "relative_path": { "type": "string", "minLength": 1 },
+        "target": { "type": "string", "minLength": 1 },
+        "target_path": { "type": "string", "minLength": 1 },
+        "skill_name": { "type": "string", "minLength": 1 },
+        "tree_hash": { "type": ["string", "null"] },
+        "change_type": { "enum": ["present", "new", "modified", "removed", "root_missing"] },
+        "is_symlink": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "task": {
+      "type": "object",
+      "required": ["task_id", "item_id", "phase", "attempt", "role", "assigned_actor", "state", "created_at", "updated_at", "lease", "lease_count", "release_count", "last_error", "dispatch", "result_step_id", "instruction"],
+      "properties": {
+        "task_id": { "type": "string" },
+        "item_id": { "type": "string", "pattern": "^A[1-9][0-9]*$" },
+        "phase": { "enum": ["observe", "candidate", "audit", "independent_verify", "candidate_rework", "boundary_review", "aggregate"] },
+        "attempt": { "type": "integer", "minimum": 1 },
+        "role": { "enum": ["builder", "independent_verifier", "reviewer", "coordinator"] },
+        "assigned_actor": { "type": "string", "minLength": 1 },
+        "state": { "enum": ["PENDING", "LEASED", "COMPLETED", "CANCELLED"] },
+        "created_at": { "type": "string" },
+        "updated_at": { "type": "string" },
+        "lease": { "type": ["object", "null"] },
+        "lease_count": { "type": "integer", "minimum": 0 },
+        "release_count": { "type": "integer", "minimum": 0 },
+        "last_error": { "type": ["string", "null"] },
+        "dispatch": { "type": "array", "items": { "$ref": "#/$defs/taskDispatch" } },
+        "result_step_id": { "type": ["string", "null"] },
+        "instruction": { "type": "string", "minLength": 1 },
+        "escalated_from_actor": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "taskDispatch": {
+      "type": "object",
+      "required": ["channel", "message_ref", "ts"],
+      "properties": {
+        "channel": { "type": "string", "minLength": 1 },
+        "message_ref": { "type": "string", "minLength": 1 },
+        "ts": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "delivery": {
+      "type": "object",
+      "required": [
+        "channel",
+        "message_ref",
+        "ts",
+        "sender_actor",
+        "idempotency_key",
+        "adapter_evidence",
+        "report_body_hash",
+        "delivery_text_hash",
+        "authorized_reply_senders"
+      ],
+      "properties": {
+        "channel": { "type": "string", "minLength": 1 },
+        "message_ref": { "type": "string", "minLength": 1 },
+        "ts": { "type": "string" },
+        "sender_actor": { "type": "string", "minLength": 1 },
+        "idempotency_key": { "type": "string", "minLength": 1 },
+        "adapter_evidence": { "$ref": "#/$defs/evidence" },
+        "report_body_hash": { "type": "string", "pattern": "^sha256:" },
+        "delivery_text_hash": { "type": "string", "pattern": "^sha256:" },
+        "authorized_reply_senders": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 }
+        }
+      },
+      "additionalProperties": false
+    },
+    "reportSummary": {
+      "type": "object",
+      "required": [
+        "report_version",
+        "scope_revision",
+        "report_hash",
+        "plain_report_sha256",
+        "material_hash",
+        "state",
+        "json_path",
+        "markdown_path",
+        "delivery"
+      ],
+      "properties": {
+        "report_version": { "type": "integer", "minimum": 1 },
+        "scope_revision": { "type": "integer", "minimum": 1 },
+        "report_hash": { "type": "string", "pattern": "^sha256:" },
+        "plain_report_sha256": { "type": "string", "pattern": "^sha256:" },
+        "material_hash": { "type": "string", "pattern": "^sha256:" },
+        "state": { "type": "string" },
+        "json_path": { "type": "string" },
+        "markdown_path": { "type": "string" },
+        "delivery": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/delivery" }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
