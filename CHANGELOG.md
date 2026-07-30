@@ -1,5 +1,26 @@
 # Changelog
 
+## v4.0.0 - 2026-07-29
+
+### Added
+
+- Controlled scenario taxonomy and deterministic route-map validation.
+- Explicit positive, negative, ambiguous, and handoff boundaries for Skill routing.
+- Opt-in privacy-minimal usage events and session-free aggregate reports.
+- Evidence-tiered value-delta delivery reports.
+- Schemas and focused tests for routing, telemetry, and delivery reports.
+
+### Changed
+
+- Public terminology now uses generic user and review roles.
+- One-shot and Loop Engineering helpers use the current hardened formal runtime.
+- Release documentation states exact dependency, privacy, telemetry, and authorization boundaries.
+
+### Retained
+
+- V3 durable run ledger, independent role separation, evidence binding, approval receipts, rollback-aware promotion, and fail-closed automation.
+- Installation, formal replacement, alias changes, deletion, telemetry activation, and publication remain separately authorized user actions.
+
 ## v3.0.0 - 2026-07-14
 
 ### Added

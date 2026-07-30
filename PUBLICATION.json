@@ -1,0 +1,26 @@
+{
+  "schema": "codex.github-publication/v1",
+  "repository": "Sven-Mirana/sublation",
+  "visibility": "public",
+  "authorized_at": "2026-07-29",
+  "source_archive": "skill-sublation-v4.0.0-public-20260729.zip",
+  "source_archive_sha256": "b270a3d8a9b7f239d3c9beead244551c9a16d451385e948f19fe1cba84ed62bb",
+  "release_tag": "v4.0.0",
+  "transformations": {
+    "outer_archive_directory_removed": true,
+    "macos_metadata_and_bytecode_removed": true,
+    "local_home_prefix_redacted_to": "${HOME}",
+    "redacted_file_count": 0,
+    "release_hotfixes": [
+      "scripts/sublation_receipt.py: ignore an attested SR-XXXXXXXX approval code during item parsing",
+      "scripts/test_sublation_receipt.py: add approval-code/item-id collision regression test"
+    ],
+    "checksum_cycle_entries_removed": [],
+    "sealed_desktop_archive_modified": false
+  },
+  "remaining_boundaries": {
+    "geo_activation": false,
+    "automatic_installation": false,
+    "court_submission": false
+  }
+}

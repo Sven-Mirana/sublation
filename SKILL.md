@@ -1,7 +1,7 @@
 ---
 name: skill-sublation
-version: 3.0.0
-description: 技能扬弃（Sublation/Aufhebung）——把执行经验沉淀为观测、候选、验证、独立复核、用户批准、晋升和观察窗的可审计治理链路；显式触发时可用 one-shot 控制面自动推进到用户决策门。
+version: 4.0.0
+description: 技能扬弃（Sublation/Aufhebung）——把执行经验沉淀为观测、候选、验证、独立复核、用户批准、晋升和观察窗的可审计治理链路；V4 增加场景路由边界、隐私最小化用量观测和分层价值交付报告。
 author: Sublation contributors
 license: MIT
 metadata:
@@ -10,7 +10,7 @@ metadata:
     related_skills: []
 ---
 
-# Skill Sublation v3.0
+# Skill Sublation v4.0
 
 Sublation 是技能治理宪法，不是自动改技能的捷径。
 
@@ -187,7 +187,7 @@ Business/Boundary Reviewer 负责判断 value_delta 是否真实、用户边界�
 
 Loop Engineering 把协作拆为 Builder、Independent Verifier、Boundary Reviewer 和 Approver 四类责任。实现者自报与独立核盘必须并列，统一简报只汇总已经落盘和可复验的证据。详见 `references/loop-engineering-protocol.md`。
 
-### 3.9 V3 Automation
+### 3.9 Loop Automation
 
 `scripts/loop_engineering.py` 读取候选、执行硬门禁、聚合证据和复核状态，并生成用户决策包。默认终点是 `USER_DECISION_REQUIRED`；它不得自动晋升、自动登录、自动处理凭据、自动修改 formal skill 或自动发布。
 
@@ -201,7 +201,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 scripts/loop_engineering.py \
 
 详见 `references/loop-engineering-v3-automation.md`。
 
-### 3.10 V3 One-Shot
+### 3.10 One-Shot
 
 `scripts/sublation_one_shot.py` 只在用户明确说出 `sublation` 或“扬弃”时创建或恢复耐久 run。它连续推进 observe、candidate、audit、independent verify、rework、boundary review 和 aggregate，但只在正式晋升或其他受控动作前停到用户决策门。
 
@@ -229,6 +229,56 @@ sublation_local_adapter.py local ephemeral adapter generation
 ```
 
 完整契约见 `references/loop-engineering-v3-one-shot.md`；运行与 worker 配置分别见 `schemas/run-v1.json` 和 `schemas/worker-config-v1.json`。
+
+### 3.11 场景分类与路由边界
+
+V4 提供受控场景词表和只读路由图生成器。每个 Skill 必须分别声明：
+
+- `primary_when`：应当选中它的正向条件；
+- `not_when`：明确排除的邻域；
+- `clarify_when`：需要用户澄清的歧义；
+- `handoff_to`：交给其他 Skill 的精确条件。
+
+路由图只提供建议，不调用 Skill、不合并治理对象，也不把关键词命中冒充业务能力。运行：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/scenario_map.py \
+  --input <route-map.json> \
+  --output <route-map.md>
+```
+
+契约见 `references/scenario-taxonomy-and-routing-boundary.md` 和 `schemas/scenario-taxonomy-v1.json`。
+
+### 3.12 隐私最小化用量观测
+
+V4 可以记录 Skill 调用时间、规范化 Skill ID 和哈希化会话标识，用于聚合调用次数与独立会话数。事件不得包含 prompt、工具输入、文件路径、文件内容、结果、凭据、案件材料或模型日志。
+
+遥测默认关闭。复制或安装本 Skill 不会自动修改 hook 或 settings；启用、保留期限和删除策略均须用户另行批准。调用次数只证明入口被触发，不证明任务成功。
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/log_skill_use.py --help
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/usage_report.py --help
+```
+
+契约见 `references/usage-telemetry.md` 和 `schemas/usage-event-v1.json`。
+
+### 3.13 分层价值交付报告
+
+V4 把候选证据整理为可读的 Markdown 报告，并强制区分三类口径：
+
+- `measured`：有可复验前后值和 SHA-256 锚点；
+- `estimated`：有公式、假设、单位和证据锚点；
+- `not_measurable`：仅作定性说明，不得混入数字。
+
+报告生成不授权安装、晋升、发布或关闭观察窗。运行：
+
+```bash
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/delivery_report.py \
+  --input <delivery-report-input.json> \
+  --output <delivery-report.md>
+```
+
+契约见 `references/value-delta-delivery-report.md` 和 `schemas/delivery-report-input-v1.json`。
 
 ## 4. 八步流程
 
@@ -566,7 +616,7 @@ spec-patch 不等于低风险；如果改变晋升规则、删除能力或扩大
 
 参考 `references/github-release-checklist.md`、`references/pre-release-audit-pattern.md`、`references/github-release-workflow.md`。
 
-## 8. V3 发布验证
+## 8. V4 发布验证
 
 - [ ] `SKILL.md` frontmatter 与 Markdown 链接有效；
 - [ ] `scripts/test_*.py` 全量通过且不生成 bytecode；
@@ -574,6 +624,9 @@ spec-patch 不等于低风险；如果改变晋升规则、删除能力或扩大
 - [ ] `schemas/manifest-v3.json`、`schemas/run-v1.json`、`schemas/worker-config-v1.json` 可解析；
 - [ ] one-shot 未经显式触发时 fail closed；
 - [ ] 自动化停在用户决策门，不自行晋升；
+- [ ] 场景路由对未知 ID、自交接和缺失边界 fail closed；
+- [ ] 新用量事件仅含 `ts`、`skill`、`session_id`，且遥测默认关闭；
+- [ ] 价值报告不把估算值或定性描述冒充实测值；
 - [ ] formal root、候选、run 账本和 rollback root 的写边界彼此隔离；
 - [ ] release 包不含个人绝对路径、凭据、会话、候选正文或内部聊天记录；
 - [ ] `PACKAGE-MANIFEST.json` 与 `checksums.sha256` 已按最终文件重新生成。

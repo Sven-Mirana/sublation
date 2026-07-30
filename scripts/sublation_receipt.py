@@ -123,6 +123,9 @@ def action_pattern() -> re.Pattern[str]:
 
 ACTION_PATTERN = action_pattern()
 ITEM_PATTERN = re.compile(r"(?<![A-Za-z0-9])A\s*\d+(?!\d)", re.IGNORECASE)
+APPROVAL_CODE_PATTERN = re.compile(
+    r"(?<![A-Za-z0-9])SR-[A-F0-9]{8}(?![A-Za-z0-9])", re.IGNORECASE
+)
 
 
 def action_for_term(term: str) -> str:
@@ -179,7 +182,7 @@ def detect_all_action(text: str) -> str | None:
 
 
 def parse_decisions(message: str, item_ids: list[str]) -> dict[str, str]:
-    text = normalize(message)
+    text = APPROVAL_CODE_PATTERN.sub("", normalize(message))
     if re.search(r"(?:除了|除\s*A\s*\d+\s*之外|except)", text, flags=re.IGNORECASE):
         raise ValueError("exclusion syntax is unsupported; use '全部批准' or list each A item explicitly")
     allowed = {item.upper() for item in item_ids}

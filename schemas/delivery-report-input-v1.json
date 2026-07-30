@@ -1,0 +1,221 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/delivery-report-input-v1.json",
+  "title": "Skill Sublation Delivery Report Input v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "batch_id",
+    "measured",
+    "estimated",
+    "not_measurable"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "skill-sublation.delivery-report-input.v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "measured": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/measured_metric"
+      }
+    },
+    "estimated": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/estimated_metric"
+      }
+    },
+    "not_measurable": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/not_measurable_metric"
+      }
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "required": [
+        "label",
+        "sha256"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    },
+    "base_metric": {
+      "type": "object",
+      "required": [
+        "metric",
+        "label",
+        "evidence"
+      ],
+      "properties": {
+        "metric": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/evidence"
+          }
+        }
+      }
+    },
+    "measured_metric": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_metric"
+        },
+        {
+          "type": "object",
+          "required": [
+            "unit",
+            "before",
+            "after"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "before": {
+              "type": "number"
+            },
+            "after": {
+              "type": "number"
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "estimated_metric": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_metric"
+        },
+        {
+          "type": "object",
+          "required": [
+            "unit",
+            "value",
+            "formula",
+            "assumptions"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "minLength": 1
+            },
+            "value": {
+              "type": "number"
+            },
+            "formula": {
+              "type": "string",
+              "minLength": 1
+            },
+            "assumptions": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "not_measurable_metric": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/base_metric"
+        },
+        {
+          "type": "object",
+          "required": [
+            "statement"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "metric": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            },
+            "label": {
+              "type": "string",
+              "minLength": 1
+            },
+            "statement": {
+              "type": "string",
+              "minLength": 1
+            },
+            "evidence": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/evidence"
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

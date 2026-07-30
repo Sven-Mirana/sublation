@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/scenario-taxonomy-v1.json",
+  "title": "Skill Sublation Scenario Map Input v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "map_id",
+    "skills"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "skill-sublation.scenario-taxonomy.v1"
+    },
+    "map_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/skill_route"
+      }
+    }
+  },
+  "$defs": {
+    "scenario": {
+      "enum": [
+        "governance",
+        "legal_research",
+        "litigation_workbench",
+        "document_processing",
+        "article_writing",
+        "wechat_publishing",
+        "market_daily",
+        "media_generation",
+        "software_delivery",
+        "general_research"
+      ]
+    },
+    "handoff": {
+      "type": "object",
+      "required": [
+        "skill",
+        "when"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "when": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "routing_boundary": {
+      "type": "object",
+      "required": [
+        "primary_when",
+        "not_when",
+        "handoff_to",
+        "clarify_when"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "primary_when": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "not_when": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "handoff_to": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/handoff"
+          }
+        },
+        "clarify_when": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "skill_route": {
+      "type": "object",
+      "required": [
+        "skill",
+        "description",
+        "scenarios",
+        "routing_boundary"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "skill": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenarios": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/$defs/scenario"
+          }
+        },
+        "trigger_terms": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "routing_boundary": {
+          "$ref": "#/$defs/routing_boundary"
+        }
+      }
+    }
+  }
+}

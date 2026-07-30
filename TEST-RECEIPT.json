@@ -1,0 +1,30 @@
+{
+  "schema_version": "skill-sublation.public-test-receipt.v1",
+  "package_version": "4.0.0",
+  "recorded_at": "2026-07-29T17:26:37Z",
+  "command": "PYTHONDONTWRITEBYTECODE=1 python3 -B -m unittest discover -s scripts -p 'test_*.py'",
+  "python": "3.12",
+  "platform_scope": "macOS local runtime with sandbox-exec and loopback test server",
+  "result": {
+    "status": "PASS",
+    "tests_run": 126,
+    "failures": 0,
+    "errors": 0
+  },
+  "source_binding": {
+    "claude_formal_tree_files": 98,
+    "claude_formal_tree_sha256": "1cad2225846a4ebe041e6af88c7e1ac74bce97317bff5bf9ea81c1cc0362ac40",
+    "hermes_formal_tree_files": 98,
+    "hermes_formal_tree_sha256": "1cad2225846a4ebe041e6af88c7e1ac74bce97317bff5bf9ea81c1cc0362ac40",
+    "formal_trees_byte_identical": true,
+    "public_v3_baseline_commit": "ae1bfc716f5b43d9ecd50db2bbee8b12df827139"
+  },
+  "claim_boundary": {
+    "mechanical_test_pass_only": true,
+    "provider_or_paid_service_used": false,
+    "installation_performed": false,
+    "formal_skill_modified": false,
+    "publication_performed": false,
+    "telemetry_activated": false
+  }
+}

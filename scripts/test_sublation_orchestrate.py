@@ -189,7 +189,7 @@ class SublationOrchestrateTests(unittest.TestCase):
         self.delivery = {
             "actor": "hermes",
             "channel": "quadchat",
-            "authorized_reply_senders": ["user"],
+            "authorized_reply_senders": ["approver"],
             "argv": [
                 sys.executable,
                 str(self.delivery_script),
@@ -257,7 +257,7 @@ class SublationOrchestrateTests(unittest.TestCase):
                 "adapter_id": "quadchat-local-test",
                 "channel": "quadchat",
                 "event_id": "approval-message-1",
-                "sender_id": "user",
+                "sender_id": "approver",
                 "in_reply_to": message_ref,
                 "message": "准A1",
                 "received_at": "2026-07-10T00:00:00+00:00",

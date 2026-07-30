@@ -66,6 +66,7 @@
         "post_promotion_safety": { "$ref": "#/$defs/post_promotion_safety" },
         "value_delta": { "$ref": "#/$defs/value_delta" },
         "empirical_scorecard": { "$ref": "#/$defs/empirical_scorecard" },
+        "delivery_report": { "$ref": "#/$defs/delivery_report" },
         "pre_promotion_reports": {
           "type": "array",
           "items": { "$ref": "#/$defs/pre_promotion_report" }
@@ -476,6 +477,16 @@
         "not_applicable_reason": { "type": "string", "minLength": 1 },
         "not_measured_reason": { "type": "string", "minLength": 1 },
         "notes": { "type": "string" }
+      }
+    },
+    "delivery_report": {
+      "type": "object",
+      "required": ["path", "sha256", "generated_at"],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "generated_at": { "type": "string", "minLength": 1 }
       }
     }
   }

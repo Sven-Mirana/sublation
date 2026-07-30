@@ -330,7 +330,7 @@ def build_report(args: argparse.Namespace) -> dict[str, Any]:
         "changed_paths": changed,
         "gates": [gate.as_dict() for gate in gates],
         "value_delta_summary": str(value_delta.get("summary") or ""),
-        "automation_boundary": "Stops at USER_DECISION_REQUIRED; promotion requires user explicit approval.",
+        "automation_boundary": "Stops at USER_DECISION_REQUIRED; promotion requires explicit user approval.",
     }
 
 

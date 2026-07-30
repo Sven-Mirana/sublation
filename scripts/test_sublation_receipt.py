@@ -126,7 +126,7 @@ class SublationReceiptTests(unittest.TestCase):
             self.run_dir,
             "quadchat",
             "report-message-1",
-            ["user"],
+            ["approver"],
             sender_actor="hermes",
             idempotency_key="receipt-report-message-1",
             adapter_evidence_path=str(delivery_evidence),
@@ -139,7 +139,7 @@ class SublationReceiptTests(unittest.TestCase):
             "adapter_id": str(kwargs.pop("adapter_id", "quadchat-local-test")),
             "channel": str(kwargs.pop("channel", "quadchat")),
             "event_id": event_id,
-            "sender_id": str(kwargs.pop("sender_id", "user")),
+            "sender_id": str(kwargs.pop("sender_id", "approver")),
             "in_reply_to": str(kwargs.pop("in_reply_to", "report-message-1") or ""),
             "message": message,
             "received_at": "2026-07-10T00:00:00+00:00",
@@ -322,6 +322,12 @@ class SublationReceiptTests(unittest.TestCase):
             {"A1": "approve", "A3": "approve"},
         )
 
+    def test_approval_code_cannot_be_parsed_as_an_item_id(self) -> None:
+        self.assertEqual(
+            sublation_receipt.parse_decisions("SR-A167602F 准A1", ["A1"]),
+            {"A1": "approve"},
+        )
+
     def test_item_between_conflicting_actions_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "ambiguous decision"):
             sublation_receipt.parse_decisions("批准 A1 暂缓", ["A1", "A2"])
@@ -442,7 +448,7 @@ class SublationReceiptTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "binding"):
             self.apply("全部批准", "user-9", in_reply_to="old-message")
         with self.assertRaisesRegex(ValueError, "sender binding"):
-            self.apply("全部批准", "user-wrong-sender", sender_id="not-user")
+            self.apply("全部批准", "user-wrong-sender", sender_id="not-approver")
 
     def test_missing_in_reply_to_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "missing fields: in_reply_to"):

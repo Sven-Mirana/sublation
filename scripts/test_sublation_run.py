@@ -678,7 +678,7 @@ class SublationRunTests(unittest.TestCase):
             run_dir,
             "quadchat",
             "message-100",
-            ["user"],
+            ["approver"],
             sender_actor="hermes",
             idempotency_key="delivery-message-100",
             adapter_evidence_path=adapter_evidence,

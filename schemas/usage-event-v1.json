@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hermes.local/sublation/usage-event-v1.json",
+  "title": "Skill Sublation Usage Event v1",
+  "type": "object",
+  "required": [
+    "ts",
+    "skill",
+    "session_id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ts": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "skill": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$"
+    },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{12}$"
+    }
+  }
+}
